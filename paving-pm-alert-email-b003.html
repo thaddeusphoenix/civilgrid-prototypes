@@ -1,6 +1,7 @@
 <!--
-  BUILD b002 · Jun 22, 2026
+  BUILD b003 · Jun 22, 2026
   Build history (newest first):
+    b003 · Jun 22, 2026 — per Adam's feedback: show an existing/in-effect city moratorium (cities send what's already under moratorium), not a future one being "added"
     b002 · Jun 22, 2026 — genericized all customer-specific references (fictional utility/city/PM) for public hosting
     b001 · Jun 22, 2026 — initial build (paving data-refresh PM alert email; modeled on the Civil Search / Knock email)
   To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
@@ -174,6 +175,7 @@
     <li>Bullets carry just enough to triage; "Review Changes" deep-links to the project</li>
   </ul></div>
   <details class="info-panel-details"><summary>Build history</summary><ul>
+    <li><b>b003</b> — existing/in-effect moratorium (not a future one), per Adam's feedback</li>
     <li><b>b002</b> — genericized customer references for public hosting</li>
     <li><b>b001</b> — initial build</li>
   </ul></details>
@@ -227,10 +229,10 @@
       <ul class="details">
         <li><span class="k">Data Updated:</span> Paving Moratorium</li>
         <li><span class="k">Jurisdiction:</span> City of Rivergate</li>
-        <li><span class="k">Change:</span> New moratorium added within your project boundary</li>
+        <li><span class="k">Change:</span> An active paving moratorium now overlaps your project boundary</li>
         <li><span class="k">Affected Segment:</span> Riverside Ave (Maple St &rarr; Birch Ave)</li>
-        <li><span class="k">Moratorium Window:</span> Feb 18, 2027 &ndash; Feb 18, 2032 (5-year cut moratorium)</li>
-        <li><span class="k">Notes:</span> Agency specified: "Riverside Ave is scheduled for full-width resurfacing in Q1 2027. A 5-year curb-to-curb cut moratorium applies to the resurfaced section."</li>
+        <li><span class="k">Moratorium Window:</span> Apr 2024 &ndash; Apr 2029 (5-year cut moratorium, in effect)</li>
+        <li><span class="k">Notes:</span> From the City of Rivergate's current moratorium list: "Riverside Ave was resurfaced in spring 2024. A 5-year curb-to-curb cut moratorium is in effect through April 2029."</li>
       </ul>
 
       <a class="cta" href="#">Review Changes</a>
@@ -262,7 +264,7 @@
 
 <script>
 // Build / version stamp
-const BUILD = 2;
+const BUILD = 3;
 const BUILD_DATE = "Jun 22, 2026";
 const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
 document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
