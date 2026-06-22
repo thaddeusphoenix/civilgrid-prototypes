@@ -1,0 +1,304 @@
+<!--
+  BUILD b002 · Jun 22, 2026
+  Build history (newest first):
+    b002 · Jun 22, 2026 — genericized all customer-specific references (fictional utility/city/PM) for public hosting
+    b001 · Jun 22, 2026 — initial build (paving data-refresh PM alert email; modeled on the Civil Search / Knock email)
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paving Alert — PM Email</title>
+<style>
+  :root {
+    --orange: #f27e31;
+    --orange-dark: #da712c;
+    --grey-90: #1d1e20;
+    --grey-80: #393b3d;
+    --grey-70: #54585b;
+    --grey-50: #888c90;
+    --grey-30: #d2d4d7;
+    --grey-20: #e9eaeb;
+    --grey-10: #f4f5f5;
+    --blue-50: #196fe0;
+    /* faint street-map line pattern (inline SVG, light grey) used in the email header/footer banners */
+    --map-pattern: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='150' viewBox='0 0 240 150'><g fill='none' stroke='%23c9ccce' stroke-width='1'><path d='M-10 30 L260 38'/><path d='M-10 78 L260 70'/><path d='M-10 120 L260 128'/><path d='M30 -10 L24 160'/><path d='M88 -10 L96 160'/><path d='M150 -10 L150 160'/><path d='M205 -10 L212 160'/><path d='M-10 55 L120 -10'/><path d='M120 160 L260 95'/><circle cx='88' cy='38' r='2.5'/><circle cx='150' cy='70' r='2.5'/><circle cx='24' cy='78' r='2.5'/><circle cx='212' cy='128' r='2.5'/></g></svg>");
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding-top: 32px;
+    font-family: "Noto Sans", system-ui, -apple-system, sans-serif;
+    background: #e7e8ea;
+    color: var(--grey-90);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- email-client frame ---- */
+  .client { max-width: 720px; margin: 24px auto; padding: 0 16px; }
+  .mail-meta {
+    background: #fff; border: 1px solid var(--grey-30); border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 16px 20px; font-size: 14px; line-height: 1.55; color: var(--grey-80);
+  }
+  .mail-meta .row { display: flex; gap: 6px; }
+  .mail-meta .lbl { color: var(--grey-80); }
+  .mail-meta b { color: var(--grey-90); font-weight: 700; }
+  .mail-meta a { color: var(--blue-50); text-decoration: none; }
+  .mail-meta a:hover { text-decoration: underline; }
+  .mail-meta .subject { color: var(--grey-90); }
+
+  /* ---- the CivilGrid email itself ---- */
+  .email {
+    background: #fff; border: 1px solid var(--grey-30); border-top: none;
+    border-radius: 0 0 8px 8px; overflow: hidden;
+  }
+  .banner {
+    background-color: #fbfbfc; background-image: var(--map-pattern);
+    background-size: 240px 150px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .banner-top { height: 132px; border-bottom: 1px solid var(--grey-20); }
+  .wordmark {
+    font-size: 40px; font-weight: 800; letter-spacing: 8px;
+    color: var(--orange); text-transform: uppercase;
+    text-shadow: 0 0 14px rgba(251,251,252,0.95), 0 0 6px rgba(251,251,252,1);
+  }
+  .card {
+    margin: 22px; padding: 32px 34px;
+    border: 1px solid var(--grey-20); border-radius: 6px;
+    font-size: 16px; line-height: 1.7; color: var(--grey-90);
+  }
+  .card p { margin: 0 0 22px; }
+  .card a.inline-link { color: var(--blue-50); text-decoration: underline; }
+  .details { list-style: disc; padding-left: 26px; margin: 0 0 26px; }
+  .details li { margin-bottom: 12px; }
+  .details .k { font-weight: 400; }
+  .cta {
+    display: inline-block; background: var(--orange); color: #fff;
+    font-size: 15px; font-weight: 600; text-decoration: none;
+    padding: 11px 20px; border-radius: 6px; margin-bottom: 26px;
+    transition: background 0.12s;
+  }
+  .cta:hover { background: var(--orange-dark); }
+  .support a { color: var(--blue-50); text-decoration: underline; }
+  .prefs { font-size: 14px; color: var(--grey-70); margin: 4px 0 0; }
+  .prefs a { color: var(--blue-50); text-decoration: underline; }
+  .banner-bottom { height: 118px; border-top: 1px solid var(--grey-20); flex-direction: column; gap: 2px; }
+  .banner-bottom .org { font-size: 15px; font-weight: 700; color: var(--grey-80); }
+  .banner-bottom .addr { font-size: 13px; color: var(--grey-70); }
+  .powered { text-align: center; font-size: 14px; font-weight: 700; color: var(--grey-80); padding: 18px 0 28px; }
+
+  /* ============ required prototype chrome ============ */
+  .proto-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    height: 32px; background: #243442;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 16px; gap: 10px; user-select: none;
+  }
+  .proto-badge {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    background: none; padding: 0; color: #f27e31;
+    font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .proto-build { flex-shrink: 0; color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  .proto-desc { font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; padding: 2px 6px; }
+  .proto-actions { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+  .proto-about-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; animation: fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse {
+    0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); }
+    50%      { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); }
+  }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+  .info-panel {
+    display: none; position: fixed; top: 32px; right: 0;
+    width: 340px; background: #ffffff;
+    border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px;
+    padding: 16px; z-index: 199;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    font-size: 13px; color: #393b3d; line-height: 1.5;
+    max-height: calc(100vh - 40px); overflow-y: auto;
+  }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+  .fb-pane {
+    display: none; position: fixed; top: 32px; right: 0; bottom: 0;
+    width: 440px; max-width: 92vw; background: #fff;
+    border-left: 1px solid #d2d4d7;
+    box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199;
+    flex-direction: column; overflow: hidden;
+  }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+</style>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Paving Alert — PM Email</span>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Paving Data-Refresh Alert — PM Email</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>Does this email's shape and content give a utility project manager enough to triage a paving/moratoria change within their project boundary? Built to react to, not to ship. (Customer-specific data is fictional.)</p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li>One email per project, per PM — filterable by project, no digest</li>
+    <li>Trigger is <em>any</em> new/changed data inside the project boundary — not only conflicts</li>
+    <li>Deliberately modeled on the existing change-notification email so it reads as familiar</li>
+    <li>Bullets carry just enough to triage; "Review Changes" deep-links to the project</li>
+  </ul></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul>
+    <li><b>b002</b> — genericized customer references for public hosting</li>
+    <li><b>b001</b> — initial build</li>
+  </ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / change detection</b><ul>
+      <li>Diff each paving/moratoria refresh against prior loaded state per jurisdiction ID</li>
+      <li>Persist prior moratorium state to support feature-level deltas (not just "data refreshed")</li>
+      <li>Spatial join: match refreshed jurisdiction data to active project boundaries (+ buffer)</li>
+    </ul></div>
+    <div class="grp"><b>Notification pipeline</b><ul>
+      <li>Add per-project paving-change email template</li>
+      <li>Emit one email per project, per assigned PM, on detected change</li>
+      <li>Add per-org feature flag for paving-alert email sending (e.g. a land/right-of-way org = off)</li>
+    </ul></div>
+    <div class="grp"><b>Recipients &amp; preferences</b><ul>
+      <li>Resolve project → assigned PM(s) for addressing</li>
+      <li>Per-user notification preferences (opt-in / opt-out link target)</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app</b><ul>
+      <li>"Review Changes" deep link → project change view</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Can the rebuilt pipeline surface <i>which</i> field changed, or only that data refreshed? <span class="note">(feasibility spike)</span></li>
+      <li>Moratorium moved but still no conflict — alert or suppress?</li>
+      <li>Strict project boundary vs. ~½-mile buffer</li>
+      <li>Confirm one-email-per-project over digest on initial city load</li>
+    </ul></div>
+  </details>
+</div>
+
+<div class="client">
+  <div class="mail-meta">
+    <div class="row"><span class="lbl">From:</span> <span><b>CivilGrid</b> &lt;<a href="#">no-reply@civilgrid.com</a>&gt;</span></div>
+    <div class="row"><span class="lbl">Date:</span> <span>Mon, Jun 22, 2026 at 8:42&#8239;AM</span></div>
+    <div class="row"><span class="lbl">Subject:</span> <span class="subject">Paving data for Riverside Ave Gas Distribution Upgrade has changed</span></div>
+    <div class="row"><span class="lbl">To:</span> <span>&lt;<a href="#">marcus.rivera@northgatepower.example</a>&gt;</span></div>
+  </div>
+
+  <div class="email">
+    <div class="banner banner-top">
+      <span class="wordmark">CivilGrid</span>
+    </div>
+
+    <div class="card">
+      <p>Hi Marcus Rivera,</p>
+
+      <p>New paving data has been loaded within the boundary of
+        <a class="inline-link" href="#">Riverside Ave Gas Distribution Upgrade</a>.</p>
+
+      <ul class="details">
+        <li><span class="k">Data Updated:</span> Paving Moratorium</li>
+        <li><span class="k">Jurisdiction:</span> City of Rivergate</li>
+        <li><span class="k">Change:</span> New moratorium added within your project boundary</li>
+        <li><span class="k">Affected Segment:</span> Riverside Ave (Maple St &rarr; Birch Ave)</li>
+        <li><span class="k">Moratorium Window:</span> Feb 18, 2027 &ndash; Feb 18, 2032 (5-year cut moratorium)</li>
+        <li><span class="k">Notes:</span> Agency specified: "Riverside Ave is scheduled for full-width resurfacing in Q1 2027. A 5-year curb-to-curb cut moratorium applies to the resurfaced section."</li>
+      </ul>
+
+      <a class="cta" href="#">Review Changes</a>
+
+      <p class="support">If you have any questions, please contact <a href="#">support@civilgrid.com</a>.</p>
+
+      <p>Thanks,<br>CivilGrid Team</p>
+
+      <p class="prefs">Update notification preferences <a href="#">here</a></p>
+    </div>
+
+    <div class="banner banner-bottom">
+      <span class="org">CivilGrid</span>
+      <span class="addr">1280 Lombard St, #104, San Francisco, CA 94109</span>
+    </div>
+
+    <div class="powered">Powered by Knock</div>
+  </div>
+</div>
+
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+// Build / version stamp
+const BUILD = 2;
+const BUILD_DATE = "Jun 22, 2026";
+const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+// "About" panel — mutually exclusive with the feedback pane
+function toggleInfo() {
+  const ip = document.getElementById('info-panel');
+  const willOpen = !ip.classList.contains('open');
+  ip.classList.toggle('open');
+  if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+}
+
+// Shared Prototype Feedback Google Form
+const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+const PROTOTYPE_SLUG = FILE_NAME.replace(/\.html?$/i, "").replace(/-b\d{3,}$/i, "");
+const PROTOTYPE_NAME = "Paving Alert — PM Email";
+window.__activeScreen = window.__activeScreen || PROTOTYPE_NAME;
+
+function fbUrl(embedded) {
+  const u = new URL(FEEDBACK_FORM_BASE);
+  if (embedded) u.searchParams.set("embedded", "true");
+  u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+  u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+  u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+  return u.toString();
+}
+function fbOpen() {
+  document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+  document.getElementById('fb-frame').src = fbUrl(true);
+  document.getElementById('fb-newtab').href = fbUrl(false);
+  document.getElementById('info-panel').classList.remove('open');
+  document.getElementById('fb-pane').classList.add('open');
+}
+function fbClose() { document.getElementById('fb-pane').classList.remove('open'); }
+document.getElementById('fb-open').onclick = fbOpen;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fbClose(); });
+</script>

@@ -1,0 +1,459 @@
+<!--
+  BUILD b002 · Jun 22, 2026
+  Build history (newest first):
+    b002 · Jun 22, 2026 — compact email toggle top-right; 3 cards on one line; progress bar below cards; standard table controls
+    b001 · Jun 22, 2026 — initial build (Conflicts Summary + linked Paving Data Refresh Status page, from the 6/22 Adam/Sam meeting)
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paving Data Refresh Status</title>
+<style>
+  :root{
+    --orange:#f27e31; --primary:#243442; --primary-dark:#1f2c38;
+    --grey-90:#1d1e20; --grey-80:#393b3d; --grey-70:#54585b; --secondary:#656e75;
+    --grey-50:#888c90; --grey-40:#babdc0; --grey-30:#d2d4d7; --grey-20:#e9eaeb; --grey-10:#f4f5f5;
+    --blue-10:#eaf5ff; --blue-20:#c0dbfe; --blue-50:#196fe0; --blue-60:#134a91;
+    --green-20:#c8f5d2; --green-60:#0b7a09; --yellow-20:#ffefbb; --amber-tx:#8a6614;
+    --red-20:#f5cdcb; --red-60:#b0140f;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{ margin:0; padding-top:32px; font-family:"Noto Sans",system-ui,-apple-system,sans-serif;
+    color:var(--grey-90); -webkit-font-smoothing:antialiased; background:#fff; }
+
+  .app{ height:calc(100vh - 32px); display:flex; flex-direction:column; }
+  .topnav{ height:52px; flex-shrink:0; background:#fff; border-bottom:1px solid var(--grey-20);
+    display:flex; align-items:center; padding:0 18px; gap:18px; position:relative; }
+  .wordmark{ font-size:19px; font-weight:800; letter-spacing:1.5px; color:var(--orange); text-transform:uppercase; }
+  .tn-module{ font-size:14px; color:var(--grey-80); }
+  .tn-center{ position:absolute; left:50%; transform:translateX(-50%); font-size:14px; color:var(--grey-90); }
+  .tn-center .muted{ color:var(--grey-50); }
+  .tn-right{ margin-left:auto; display:flex; align-items:center; gap:14px; }
+  .tn-ico{ width:18px; height:18px; border:1.6px solid var(--grey-50); border-radius:50%; }
+  .avatar{ width:28px; height:28px; border-radius:50%; background:var(--primary); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
+
+  .content{ flex:1; overflow:auto; padding:22px 26px 60px; }
+  .screen.hidden{ display:none; }
+
+  /* section heads */
+  .sec-head{ display:flex; align-items:center; gap:14px; margin:4px 0 12px; }
+  .sec-head h2{ font-size:16px; font-weight:600; margin:0; }
+  .spacer{ flex:1; }
+
+  /* metric cards */
+  .cards{ display:flex; gap:18px; margin-bottom:26px; flex-wrap:wrap; }
+  .card{ flex:1; min-width:240px; background:#fff; border:1px solid var(--grey-20); border-radius:8px; padding:16px 18px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+  .card .lbl{ font-size:13px; color:var(--grey-70); display:flex; align-items:center; gap:5px; }
+  .card .ico{ width:13px; height:13px; border:1px solid var(--grey-40); border-radius:50%; font-size:9px; color:var(--grey-50); display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+  .card .num{ font-size:30px; font-weight:700; margin-top:8px; letter-spacing:-0.5px; }
+  .card .num .den{ font-size:16px; font-weight:400; color:var(--grey-50); }
+
+  /* buttons */
+  .btn{ font-size:13px; font-weight:500; padding:7px 14px; border-radius:6px; border:1px solid var(--grey-30); background:#fff; color:var(--grey-80); cursor:pointer; }
+  .btn:hover{ background:var(--grey-10); }
+  .btn-primary{ background:var(--primary); color:#fff; border-color:var(--primary); }
+  .btn-primary:hover{ background:var(--primary-dark); }
+  .link-back{ display:inline-block; font-size:14px; color:var(--blue-50); text-decoration:none; margin-bottom:14px; cursor:pointer; }
+  .link-back:hover{ text-decoration:underline; }
+
+  /* plan filter pills */
+  .plan-row{ display:flex; align-items:center; gap:8px; margin:6px 0 12px; }
+  .plan-row .label{ font-size:14px; font-weight:600; margin-right:4px; }
+  .pill{ font-size:13px; padding:3px 11px; border-radius:14px; border:1px solid var(--grey-30); background:#fff; color:var(--grey-80); cursor:pointer; }
+  .pill.active{ border-color:var(--blue-50); color:var(--blue-60); background:var(--blue-10); }
+
+  /* table toolbar */
+  .toolbar{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .pager{ display:flex; align-items:center; gap:4px; font-size:12px; color:var(--grey-70); }
+  .pager button{ border:1px solid var(--grey-30); background:#fff; border-radius:4px; width:24px; height:24px; cursor:pointer; color:var(--grey-70); font-size:11px; }
+  .pager .count{ padding:0 8px; }
+  .search{ font-size:13px; padding:5px 10px; border:1px solid var(--grey-30); border-radius:4px; width:170px; color:var(--grey-70); }
+
+  /* table */
+  .tbl-wrap{ border:1px solid var(--grey-20); border-radius:8px; overflow:auto; }
+  table{ border-collapse:collapse; width:100%; font-size:12px; white-space:nowrap; }
+  thead.grp th{ background:#fff; border-bottom:1px solid var(--grey-20); font-size:12px; font-weight:600; color:var(--grey-70); padding:8px 12px; text-align:left; }
+  thead.cols th{ background:#fff; border-bottom:1px solid var(--grey-30); font-size:12px; font-weight:500; color:var(--grey-70); padding:8px 12px; text-align:left; position:sticky; top:0; }
+  tbody td{ border-bottom:1px solid var(--grey-20); padding:9px 12px; color:var(--grey-90); vertical-align:top; }
+  tbody tr:nth-child(even){ background:var(--grey-10); }
+  .pid{ color:var(--blue-50); text-decoration:underline; cursor:pointer; }
+  .wrap-cell{ white-space:normal; max-width:170px; }
+  .sel{ display:inline-flex; align-items:center; gap:8px; border:1px solid var(--grey-30); border-radius:4px; padding:4px 8px; background:#fff; font-size:12px; color:var(--grey-80); min-width:108px; justify-content:space-between; }
+  .sel .cv{ font-size:9px; color:var(--grey-50); }
+  .chip{ display:inline-block; font-size:11px; font-weight:500; padding:2px 9px; border-radius:6px; }
+  .chip-needs{ background:#fdf0c3; color:var(--amber-tx); }
+  .chip-plain{ color:var(--grey-90); }
+
+  /* status chips (refresh page) */
+  .st{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:500; padding:3px 9px; border-radius:9999px; }
+  .st::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:0.85; }
+  .st-received{ background:var(--green-20); color:var(--green-60); }
+  .st-changes{ background:var(--yellow-20); color:var(--amber-tx); }
+  .st-followed{ background:#ffe2c2; color:#b5651d; }
+  .st-sent{ background:var(--blue-20); color:var(--blue-60); }
+  .st-none{ background:var(--grey-20); color:var(--grey-70); }
+  .st-nodata{ background:var(--red-20); color:var(--red-60); }
+
+  /* progress header */
+  .progress-card{ background:#fff; border:1px solid var(--grey-20); border-radius:8px; padding:18px 20px; margin-bottom:18px; }
+  .progress-card .top{ display:flex; align-items:baseline; gap:10px; }
+  .progress-card .pct{ font-size:26px; font-weight:700; }
+  .progress-card .ttl{ font-size:14px; color:var(--grey-70); }
+  .bar{ height:10px; border-radius:9999px; background:var(--grey-20); margin-top:12px; overflow:hidden; }
+  .bar > span{ display:block; height:100%; background:var(--primary); border-radius:9999px; }
+  .asof{ font-size:12px; color:var(--grey-50); margin-top:8px; }
+
+  /* editable notes */
+  .note-cell{ white-space:normal; max-width:230px; min-width:160px; font-size:12px; color:var(--grey-80);
+    border:1px dashed transparent; border-radius:4px; padding:4px 6px; outline:none; cursor:text; }
+  .note-cell:hover{ border-color:var(--grey-30); }
+  .note-cell:focus{ border-color:var(--blue-50); border-style:solid; background:#fff; }
+  .note-cell:empty::before{ content:"Add a note…"; color:var(--grey-40); }
+
+  /* opt-in */
+  .optin{ display:flex; align-items:center; gap:12px; background:var(--grey-10); border:1px solid var(--grey-20); border-radius:8px; padding:12px 16px; margin-bottom:18px; }
+  .optin .txt{ flex:1; }
+  .optin .t{ font-size:14px; font-weight:500; color:var(--secondary); }
+  .optin .d{ font-size:13px; color:var(--grey-50); margin-top:2px; }
+  .sw{ position:relative; flex-shrink:0; width:36px; height:20px; border-radius:9999px; background:var(--grey-50); border:none; cursor:pointer; transition:background .12s; padding:0; }
+  .sw[data-on="true"]{ background:var(--primary); }
+  .sw .knob{ position:absolute; top:1px; left:1px; width:18px; height:18px; border-radius:9999px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.25); transition:transform .1s; }
+  .sw[data-on="true"] .knob{ transform:translateX(17px); }
+
+  .note-foot{ font-size:13px; color:var(--grey-70); margin-top:14px; }
+  .note-foot b{ font-weight:600; }
+
+  /* compact email opt-in (top-right) */
+  .email-optin{ display:inline-flex; align-items:center; gap:9px; font-size:13px; color:var(--secondary); cursor:pointer; white-space:nowrap; }
+
+  /* slim progress bar below the cards */
+  .prog{ margin:0 0 22px; }
+  .prog-cap{ display:flex; align-items:baseline; gap:10px; font-size:13px; color:var(--grey-70); margin-bottom:6px; }
+  .prog-cap b{ color:var(--grey-90); font-weight:600; }
+  .prog-cap .muted2{ color:var(--grey-50); margin-left:auto; }
+
+  /* standard table controls (per projects page) */
+  .std-toolbar{ display:flex; align-items:center; gap:4px; margin-bottom:8px; }
+  .std-search{ display:flex; align-items:center; gap:7px; border:1px solid var(--grey-30); border-radius:6px; padding:6px 10px; width:240px; background:#fff; margin-right:4px; }
+  .std-search .mag{ width:12px; height:12px; border:1.6px solid var(--grey-50); border-radius:50%; position:relative; flex-shrink:0; }
+  .std-search .mag::after{ content:""; position:absolute; width:5px; height:1.6px; background:var(--grey-50); transform:rotate(45deg); right:-3px; bottom:-1px; }
+  .std-search input{ border:none; outline:none; font-size:13px; flex:1; color:var(--grey-80); background:transparent; min-width:0; }
+  .std-search .clear{ color:var(--grey-50); cursor:pointer; font-size:15px; line-height:1; }
+  .ic-btn{ width:30px; height:30px; border:none; background:transparent; border-radius:6px; cursor:pointer; color:var(--grey-70); font-size:15px; display:inline-flex; align-items:center; justify-content:center; }
+  .ic-btn:hover{ background:var(--grey-10); }
+  .cols-ic{ display:inline-block; width:13px; height:13px;
+    background:
+      linear-gradient(var(--grey-60),var(--grey-60)) left/2px 100% no-repeat,
+      linear-gradient(var(--grey-60),var(--grey-60)) center/2px 100% no-repeat,
+      linear-gradient(var(--grey-60),var(--grey-60)) right/2px 100% no-repeat; }
+  .funnel-ic{ display:inline-block; width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:9px solid var(--grey-60); }
+  .std-pager{ display:flex; align-items:center; gap:4px; }
+  .std-pager .chev{ width:24px; height:24px; border:1px solid var(--grey-30); background:#fff; border-radius:4px; cursor:pointer; color:var(--grey-70); font-size:11px; }
+  .std-pager .chev:hover{ background:var(--grey-10); }
+  .std-pager .rng{ font-size:12px; color:var(--grey-70); padding:0 8px; }
+
+  /* ============ required prototype chrome ============ */
+  .proto-bar{ position:fixed; top:0; left:0; right:0; z-index:200; height:32px; background:#243442; display:flex; align-items:center; justify-content:center; padding:0 16px; gap:10px; user-select:none; }
+  .proto-badge{ position:absolute; left:16px; top:50%; transform:translateY(-50%); background:none; padding:0; color:#f27e31; font-size:15px; font-weight:800; letter-spacing:1px; text-transform:uppercase; }
+  .proto-build{ flex-shrink:0; color:rgba(255,255,255,0.5); font-size:11px; font-weight:600; letter-spacing:0.4px; }
+  .proto-desc{ font-size:12px; color:rgba(255,255,255,0.65); white-space:nowrap; padding:2px 6px; }
+  .proto-actions{ position:absolute; right:12px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:8px; }
+  .proto-about-btn{ border:1px solid rgba(255,255,255,0.3); background:transparent; color:rgba(255,255,255,0.85); font-size:11px; font-weight:600; letter-spacing:0.3px; padding:3px 12px; border-radius:12px; cursor:pointer; transition:background 0.12s; }
+  .proto-about-btn:hover{ background:rgba(255,255,255,0.15); color:#fff; }
+  .proto-fb-btn{ border:1px solid rgba(255,255,255,0.3); background:transparent; color:#fff; font-size:11px; font-weight:600; letter-spacing:0.3px; padding:3px 12px; border-radius:12px; cursor:pointer; transition:background 0.12s; animation:fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse{ 0%,100%{ background:rgba(242,126,49,0); border-color:rgba(255,255,255,0.3); box-shadow:0 0 0 0 rgba(242,126,49,0.55);} 50%{ background:#f27e31; border-color:#f27e31; box-shadow:0 0 0 5px rgba(242,126,49,0);} }
+  .proto-fb-btn:hover{ animation:none; background:rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce){ .proto-fb-btn{ animation:none; } }
+  .info-panel{ display:none; position:fixed; top:32px; right:0; width:340px; background:#fff; border:1px solid #d2d4d7; border-left:none; border-bottom-left-radius:8px; padding:16px; z-index:199; box-shadow:0 4px 16px rgba(0,0,0,0.15); font-size:13px; color:#393b3d; line-height:1.5; max-height:calc(100vh - 40px); overflow-y:auto; }
+  .info-panel.open{ display:block; }
+  .info-panel-title{ font-size:14px; font-weight:600; color:#1d1e20; margin-bottom:12px; }
+  .info-panel-section{ margin-bottom:10px; }
+  .info-panel-section strong{ font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888c90; display:block; margin-bottom:4px; }
+  .info-panel-section p, .info-panel-section ul{ margin:0; padding:0; }
+  .info-panel-section ul{ padding-left:16px; }
+  .info-panel-section li{ margin-bottom:3px; }
+  .info-panel-details{ margin-top:12px; border-top:1px solid #e9eaeb; padding-top:10px; }
+  .info-panel-details summary{ font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888c90; font-weight:700; cursor:pointer; list-style:none; display:flex; align-items:center; gap:6px; }
+  .info-panel-details summary::-webkit-details-marker{ display:none; }
+  .info-panel-details summary::before{ content:"\25B8"; font-size:9px; transition:transform 0.1s; }
+  .info-panel-details[open] summary::before{ transform:rotate(90deg); }
+  .info-panel-details .grp{ margin-top:9px; }
+  .info-panel-details .grp > b{ display:block; font-size:11px; font-weight:600; color:#54585b; margin-bottom:3px; }
+  .info-panel-details ul{ padding-left:16px; margin:0; }
+  .info-panel-details li{ margin-bottom:2px; font-size:12px; line-height:1.4; }
+  .info-panel-details .note{ color:#888c90; font-style:italic; }
+  .fb-pane{ display:none; position:fixed; top:32px; right:0; bottom:0; width:440px; max-width:92vw; background:#fff; border-left:1px solid #d2d4d7; box-shadow:-4px 4px 16px rgba(0,0,0,0.15); z-index:199; flex-direction:column; overflow:hidden; }
+  .fb-pane.open{ display:flex; }
+  .fb-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e9eaeb; font-size:13px; color:#393b3d; flex-shrink:0; }
+  .fb-head b{ color:#1d1e20; }
+  .fb-close{ border:none; background:none; font-size:20px; line-height:1; color:#888c90; cursor:pointer; padding:0 4px; }
+  .fb-close:hover{ color:#1d1e20; }
+  .fb-frame{ flex:1; width:100%; border:none; }
+  .fb-newtab{ display:block; padding:8px 16px; border-top:1px solid #e9eaeb; font-size:12px; color:#196fe0; text-decoration:none; flex-shrink:0; }
+  .fb-newtab:hover{ text-decoration:underline; }
+</style>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Conflicts Summary → Paving Data Refresh Status</span>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Paving Data Refresh Status</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>From the 6/22 Adam/Sam meeting: give program managers a status page showing how far along CivilGrid is on the quarterly paving/moratoria data refresh across the service territory — reachable from where conflicts already live.</p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li>The <b>Data Refresh Status</b> link sits on the Conflicts Summary page (click it to cross over)</li>
+    <li>Top meta progress tracker (“50% complete”) + per-jurisdiction outreach status chips</li>
+    <li>Notes cells are <b>admin-editable</b> (click one and type) — Adam's ask</li>
+    <li>Opt-in toggle for the monthly summary email that replaces the spreadsheet to the program manager</li>
+  </ul></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b002</b> — compact email toggle, cards on one line, progress bar below, standard table controls</li><li><b>b001</b> — initial build</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Derive per-jurisdiction last-refresh date from existing load timestamps</li>
+      <li>Model outreach status per jurisdiction (No Outreach / Sent / Followed Up / Received / Received–Changes / No Data)</li>
+      <li>Per-jurisdiction admin-editable notes field (static facts + outreach notes)</li>
+      <li>Compute projects-impacted per jurisdiction via spatial join to project boundaries</li>
+    </ul></div>
+    <div class="grp"><b>Status page UI</b><ul>
+      <li>Add Data Refresh Status route + link from Conflicts Summary</li>
+      <li>Meta progress tracker (quarterly % complete) + summary cards</li>
+      <li>Jurisdiction status table with editable notes</li>
+    </ul></div>
+    <div class="grp"><b>Program-manager digest</b><ul>
+      <li>Opt-in monthly/quarterly summary email (jurisdictions updated, projects impacted)</li>
+      <li>Per-org feature flag / service-territory scoping</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Chunky status first vs. granular outreach detail <span class="note">(meeting: start chunky)</span></li>
+      <li>Admin edit surface for notes — inline vs. separate admin view <span class="note">(Adam)</span></li>
+      <li>Is this org-level (territory) or also project-scoped? <span class="note">(open)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<div class="app">
+  <div class="topnav">
+    <span class="wordmark">CivilGrid</span>
+    <span class="tn-module">Conflicts Summary &#9662;</span>
+    <div class="tn-center"><span class="muted">ACME Engin&hellip;</span> &nbsp;/&nbsp; &#9662;</div>
+    <div class="tn-right"><span class="tn-ico"></span><span class="tn-ico"></span><span class="avatar">NS</span></div>
+  </div>
+
+  <div class="content">
+
+    <!-- ============ SCREEN 1: CONFLICTS SUMMARY ============ -->
+    <div class="screen" id="screen-summary">
+      <div class="sec-head">
+        <h2>Overview</h2>
+        <div class="spacer"></div>
+        <button class="btn btn-primary" onclick="showScreen('status')">Data Refresh Status &rarr;</button>
+      </div>
+
+      <div class="cards">
+        <div class="card"><div class="lbl">Needs Review <span class="ico">?</span></div><div class="num">658 <span class="den">/ 868</span></div></div>
+        <div class="card"><div class="lbl">Cleared <span class="ico">?</span></div><div class="num">0 <span class="den">/ 868</span></div></div>
+        <div class="card"><div class="lbl">Total Conflict Area (sq. ft.)</div><div class="num">8,443,772</div></div>
+      </div>
+
+      <div class="plan-row">
+        <span class="label">Plan</span>
+        <span class="pill active">All</span><span class="pill">2020</span><span class="pill">2023</span>
+        <span class="pill">2024</span><span class="pill">2025</span><span class="pill">2026</span><span class="pill">2027</span>
+      </div>
+
+      <div class="toolbar">
+        <div class="pager"><button>&laquo;</button><button>&lsaquo;</button><span class="count">1 - 100 of 868</span><button>&rsaquo;</button><button>&raquo;</button></div>
+        <div class="spacer"></div>
+        <button class="btn">Export to Excel</button>
+        <input class="search" placeholder="Search…">
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead class="grp">
+            <tr>
+              <th colspan="8"></th>
+              <th colspan="5">Project Conflicts</th>
+              <th colspan="4">Right of Way Information</th>
+            </tr>
+          </thead>
+          <thead class="cols">
+            <tr>
+              <th>Project ID</th><th>Name</th><th>Plan Status</th><th>Construction Year</th><th>Construction Start Date</th>
+              <th>Recommendation</th><th>PM</th><th>Notes</th>
+              <th>Conflict Area (sq. ft.)</th><th>% Conflict</th><th>Paving Moratoria Info</th><th>Paving Projects Info</th><th>Capital Improvement Projects Info</th>
+              <th>Jurisdiction Count</th><th>Rail</th><th>Transit</th><th>Roads</th>
+            </tr>
+          </thead>
+          <tbody id="cs-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ SCREEN 2: PAVING DATA REFRESH STATUS ============ -->
+    <div class="screen hidden" id="screen-status">
+      <span class="link-back" onclick="showScreen('summary')">&#8249; Back to Conflicts Summary</span>
+
+      <div class="sec-head">
+        <h2>Paving &amp; Moratoria Data — Refresh Status</h2>
+        <div class="spacer"></div>
+        <label class="email-optin" title="A monthly digest of which jurisdictions were updated and how many projects were impacted — replaces the manual spreadsheet to the program manager.">
+          <span>Monthly summary email</span>
+          <button class="sw" data-on="true" onclick="flip(this)"><span class="knob"></span></button>
+        </label>
+      </div>
+
+      <div class="cards">
+        <div class="card"><div class="lbl">Jurisdictions Refreshed</div><div class="num">12 <span class="den">/ 24</span></div></div>
+        <div class="card"><div class="lbl">Awaiting Response</div><div class="num">8</div></div>
+        <div class="card"><div class="lbl">Projects Impacted (this refresh)</div><div class="num">37</div></div>
+      </div>
+
+      <div class="prog">
+        <div class="prog-cap"><span><b>Q2 2026 refresh</b> — 50% complete</span><span class="muted2">12 of 24 jurisdictions · as of Jun 22, 2026</span></div>
+        <div class="bar"><span style="width:50%"></span></div>
+      </div>
+
+      <div class="std-toolbar">
+        <div class="std-search"><span class="mag"></span><input placeholder="Search…"><span class="clear">&times;</span></div>
+        <button class="ic-btn" title="Settings">&#9881;</button>
+        <button class="ic-btn" title="Columns"><span class="cols-ic"></span></button>
+        <button class="ic-btn" title="Filter"><span class="funnel-ic"></span></button>
+        <div class="spacer"></div>
+        <div class="std-pager">
+          <button class="chev">&laquo;</button><button class="chev">&lsaquo;</button>
+          <span class="rng">1 - 12 of 24</span>
+          <button class="chev">&rsaquo;</button><button class="chev">&raquo;</button>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead class="cols">
+            <tr>
+              <th>Jurisdiction</th><th>Type</th><th>Last Refresh</th><th>Outreach Status</th><th>Projects Impacted</th><th>Notes (editable)</th>
+            </tr>
+          </thead>
+          <tbody id="rs-rows"></tbody>
+        </table>
+      </div>
+
+      <div class="note-foot"><b>Note:</b> Last-refresh dates come from loaded data automatically; outreach status and notes are maintained by your CivilGrid team.</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head"><span>Feedback on: <b id="fb-ctx"></b></span><button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button></div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+// ===== fake data =====
+const CS = [
+  ['Y8W9CQ','Round Rock Paving Demo','In Review','2025','1/1/2025','needs','A. Rivera','106,786','100%','City of Round Rock: Unknown - Unknown','City of Round Rock: 2026 - Unknown','','2','0','4','12'],
+  ['JFHFCA','Intelligence Changes - Demo','In Review','2027','1/1/2027','defer','A. Rivera','20,470','100%','San Jose: 2025 - 2027','City of San Jose: 2025 - 2025','','2','0','0','3'],
+  ['TPI3OT','Intelligence Paving Projects','In Review','2025','11/13/2025','needs','A. Rivera','34,221','100%','New York City: 2022 - 2029','NYC Dept. of Transportation: 2019 - Unknown','','2','0','0','4'],
+  ['TQ3PCH','Irvine','Needs Review','2025','8/25/2025','defer','M. Chen','308,105','100%','Irvine: 2023 - 2027','','','2','0','4','3'],
+  ['AB2DAX','ACME Test','Needs Review','2024','10/29/2024','needs','M. Chen','18,101','100%','Norwalk: Unknown - 2029','','','2','0','0','4'],
+  ['4AUY7M','Temescal ADU','Needs Review','2024','8/2/2024','defer','J. Park','336','100%','Oakland: 2024 - 2029','','','2','0','0','1'],
+  ['IPAJNL','Rachel Carlson Elementary','Needs Review','2024','7/6/2024','defer','M. Chen','69,658','100%','San Jose: 2024 - 2026','','','2','0','0','7'],
+  ['VIX4OD','13130 Gallagher RD','Needs Review','2024','7/6/2024','needs','D. Singh','5,011','100%','','SanJoaquin: Unknown - Unknown','','1','0','0','1'],
+  ['8YQNOL','May 2026 Gas Main Replacement','In Review','2026','5/8/2026','needs','D. Singh','29,906','99%','Sunnyvale: Unknown - 2027','Sunnyvale: 2026 - 2026','','2','0','0','4'],
+  ['8WNTF4','Main Replacement - Vistapark Drive','Needs Review','2025','5/28/2025','defer','D. Singh','68,665','94%','San Jose: 2024 - 2026','','','2','0','0','6'],
+];
+function rec(t){ return t==='needs' ? '<span class="chip chip-needs">Needs Review</span>' : '<span class="chip chip-plain">Defer</span>'; }
+document.getElementById('cs-rows').innerHTML = CS.map(r => `<tr>
+  <td><span class="pid">${r[0]}</span></td>
+  <td class="wrap-cell">${r[1]}</td>
+  <td><span class="sel">${r[2]} <span class="cv">&#9662;</span></span></td>
+  <td>${r[3]}</td><td>${r[4]}</td>
+  <td>${rec(r[5])}</td>
+  <td>${r[6]}</td><td></td>
+  <td>${r[7]}</td><td>${r[8]}</td>
+  <td class="wrap-cell">${r[10]}</td><td class="wrap-cell">${r[11]}</td><td class="wrap-cell">${r[12]}</td>
+  <td>${r[13]}</td><td>${r[14]}</td><td>${r[15]}</td><td>${r[16]}</td>
+</tr>`).join('');
+
+const ST_CLASS = { received:'st-received', changes:'st-changes', followed:'st-followed', sent:'st-sent', none:'st-none', nodata:'st-nodata' };
+const ST_LABEL = { received:'Received', changes:'Received — Changes', followed:'Followed Up', sent:'Sent', none:'No Outreach', nodata:'No Data' };
+const RS = [
+  ['San Jose','City','Jun 18, 2026','changes','9','5-year moratorium added on the N. Blackstone corridor'],
+  ['Oakland','City','Jun 15, 2026','received','5','Provides data via public portal only'],
+  ['Sunnyvale','City','Jun 12, 2026','received','3',''],
+  ['Fremont','City','Jun 10, 2026','received','2',''],
+  ['Santa Clara County','County','Jun 9, 2026','received','4',''],
+  ['Mountain View','City','Jun 5, 2026','received','1',''],
+  ['Hayward','City','—','followed','—','Followed up twice, no response'],
+  ['Alameda County','County','—','sent','—',''],
+  ['Berkeley','City','—','sent','—',''],
+  ['Palo Alto','City','Mar 2026','nodata','0','Same document as last quarter — no change'],
+  ['Milpitas','City','—','none','—',''],
+  ['Redwood City','City','—','none','—',''],
+];
+document.getElementById('rs-rows').innerHTML = RS.map(r => `<tr>
+  <td style="font-weight:500;">${r[0]}</td>
+  <td>${r[1]}</td>
+  <td>${r[2]}</td>
+  <td><span class="st ${ST_CLASS[r[3]]}">${ST_LABEL[r[3]]}</span></td>
+  <td>${r[4]}</td>
+  <td><div class="note-cell" contenteditable="true">${r[5]}</div></td>
+</tr>`).join('');
+
+// ===== interactions =====
+function showScreen(which){
+  document.getElementById('screen-summary').classList.toggle('hidden', which!=='summary');
+  document.getElementById('screen-status').classList.toggle('hidden', which!=='status');
+  document.querySelector('.content').scrollTop = 0;
+  window.__activeScreen = which==='status' ? 'Paving Data Refresh Status' : 'Conflicts Summary';
+}
+function flip(el){ el.setAttribute('data-on', String(el.getAttribute('data-on')!=='true')); }
+
+// ===== required prototype chrome =====
+const BUILD = 2;
+const BUILD_DATE = "Jun 22, 2026";
+const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+function toggleInfo(){
+  const ip = document.getElementById('info-panel');
+  const willOpen = !ip.classList.contains('open');
+  ip.classList.toggle('open');
+  if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+}
+
+const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+const PROTOTYPE_NAME = "Paving Data Refresh Status";
+window.__activeScreen = window.__activeScreen || 'Conflicts Summary';
+
+function fbUrl(embedded){
+  const u = new URL(FEEDBACK_FORM_BASE);
+  if (embedded) u.searchParams.set("embedded", "true");
+  u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+  u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+  u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+  return u.toString();
+}
+function fbOpen(){
+  document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+  document.getElementById('fb-frame').src = fbUrl(true);
+  document.getElementById('fb-newtab').href = fbUrl(false);
+  document.getElementById('info-panel').classList.remove('open');
+  document.getElementById('fb-pane').classList.add('open');
+}
+function fbClose(){ document.getElementById('fb-pane').classList.remove('open'); }
+document.getElementById('fb-open').onclick = fbOpen;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fbClose(); });
+</script>
