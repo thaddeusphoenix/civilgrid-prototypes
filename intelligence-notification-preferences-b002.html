@@ -1,0 +1,438 @@
+<!--
+  BUILD b002 · Jun 22, 2026
+  Build history (newest first):
+    b002 · Jun 22, 2026 — reduced preferences to a single "New Paving Data" flag
+    b001 · Jun 22, 2026 — initial build (Intelligence tab gets a Notifications sub-tab + Notification Preferences panel, mirroring Utilities)
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intelligence — Notification Preferences</title>
+<style>
+  :root{
+    --orange:#f27e31; --orange-60:#da712c;
+    --primary:#243442; --primary-dark:#1f2c38;
+    --grey-90:#1d1e20; --grey-80:#393b3d; --grey-70:#54585b; --secondary:#656e75;
+    --grey-50:#888c90; --grey-40:#babdc0; --grey-30:#d2d4d7; --grey-20:#e9eaeb; --grey-10:#f4f5f5;
+    --blue-10:#eaf5ff; --blue-50:#196fe0; --blue-60:#134a91;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; padding-top:32px;
+    font-family:"Noto Sans",system-ui,-apple-system,sans-serif;
+    color:var(--grey-90); -webkit-font-smoothing:antialiased;
+    background:#fff;
+  }
+
+  /* ===== app shell ===== */
+  .app{ height:calc(100vh - 32px); display:flex; flex-direction:column; }
+  .topnav{
+    height:52px; flex-shrink:0; background:#fff; border-bottom:1px solid var(--grey-20);
+    display:flex; align-items:center; padding:0 16px; gap:18px; position:relative;
+  }
+  .tn-left{ display:flex; align-items:center; gap:18px; }
+  .wordmark{ font-size:19px; font-weight:800; letter-spacing:1.5px; color:var(--orange); text-transform:uppercase; }
+  .tn-projects{ font-size:14px; color:var(--grey-80); }
+  .tn-center{
+    position:absolute; left:50%; transform:translateX(-50%);
+    font-size:14px; color:var(--grey-90); white-space:nowrap;
+  }
+  .tn-center .muted{ color:var(--grey-50); }
+  .tn-center b{ font-weight:600; }
+  .tn-right{ margin-left:auto; display:flex; align-items:center; gap:14px; }
+  .tn-ico{ width:18px; height:18px; border:1.6px solid var(--grey-50); border-radius:50%; }
+  .avatar{ width:28px; height:28px; border-radius:50%; background:var(--primary); color:#fff;
+    font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
+
+  .main{ flex:1; display:flex; min-height:0; }
+
+  /* ===== left nav ===== */
+  .leftnav{
+    width:212px; flex-shrink:0; background:#fff; border-right:1px solid var(--grey-30);
+    overflow-y:auto; padding:12px 8px;
+  }
+  .proj-card{ display:flex; gap:8px; padding:4px; margin-bottom:10px; }
+  .proj-bar{ width:4px; flex-shrink:0; background:var(--orange); border-radius:9999px; }
+  .proj-name{ font-size:15px; font-weight:500; line-height:1.25; }
+  .proj-pm{ font-size:12px; color:var(--grey-90); margin-top:3px; }
+  .badge-proj{ display:inline-block; margin-top:6px; font-size:11px; font-weight:500;
+    background:#f7d0ae; color:#7a451c; padding:1px 8px; border-radius:4px; }
+  .nav-div{ height:1px; background:var(--grey-20); margin:6px 2px 10px; }
+  .nav-sec{ font-size:14px; font-weight:500; color:var(--secondary); padding:6px 8px 4px; }
+  .nav-item{
+    display:block; font-size:14px; color:var(--grey-90); padding:6px 8px; border-radius:2px;
+    cursor:pointer; user-select:none; text-decoration:none;
+  }
+  .nav-item:hover{ background:var(--grey-20); }
+  .nav-item.active{ background:var(--blue-10); color:var(--blue-60); font-weight:500; }
+  .nav-item .beta{
+    display:inline-block; margin-left:8px; font-size:10px; font-weight:600; line-height:1.4;
+    background:var(--orange); color:#fff; padding:1px 7px; border-radius:4px; vertical-align:middle;
+  }
+  .nav-children{ margin-left:16px; padding:4px 0; display:flex; flex-direction:column; gap:4px; }
+  .nav-child{
+    display:block; font-size:14px; color:var(--grey-90); padding:6px 8px; border-radius:6px;
+    cursor:pointer; user-select:none; text-decoration:none;
+  }
+  .nav-child:hover{ background:var(--grey-20); color:var(--primary-dark); }
+  .nav-child.active{ background:var(--blue-10); color:var(--blue-60); font-weight:500; }
+
+  /* ===== map ===== */
+  .map{ flex:1; position:relative; overflow:hidden; background:#ececec; }
+  .map svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .layers-btn{
+    position:absolute; top:12px; left:12px; z-index:5;
+    display:flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--grey-30);
+    border-radius:6px; padding:6px 11px; font-size:13px; color:var(--grey-80); font-weight:500;
+    box-shadow:0 1px 4px rgba(0,0,0,0.12); cursor:pointer;
+  }
+  .layers-btn .stack{ width:13px; height:13px; border:1.5px solid var(--grey-70); border-radius:2px; transform:rotate(45deg); }
+  .map-ctrl{
+    position:absolute; bottom:74px; left:12px; z-index:5; display:flex; flex-direction:column;
+    background:#fff; border:1px solid var(--grey-30); border-radius:6px; overflow:hidden;
+    box-shadow:0 1px 4px rgba(0,0,0,0.12);
+  }
+  .map-ctrl button{ width:30px; height:30px; border:none; background:#fff; cursor:pointer;
+    font-size:16px; color:var(--grey-70); border-bottom:1px solid var(--grey-20); }
+  .map-ctrl button:last-child{ border-bottom:none; }
+  .map-scale{ position:absolute; bottom:14px; left:14px; z-index:5; font-size:11px; color:var(--grey-70); }
+  .map-scale .bar{ width:64px; height:5px; border:1px solid var(--grey-70); border-top:none; margin-top:2px; }
+  .map-attr{ position:absolute; bottom:4px; right:8px; z-index:5; font-size:10px; color:#8a8d90; }
+
+  /* ===== notification preferences panel ===== */
+  .panel{
+    position:absolute; top:0; right:0; bottom:0; width:374px; z-index:10;
+    background:#fff; border-left:1px solid var(--grey-20); box-shadow:-4px 0 16px rgba(0,0,0,0.08);
+    display:flex; flex-direction:column;
+  }
+  .panel.hidden{ display:none; }
+  .panel-head{ display:flex; align-items:center; gap:8px; padding:18px 18px 8px; }
+  .panel-head .chev{ font-size:18px; color:var(--grey-50); cursor:pointer; line-height:1; }
+  .panel-head .title{ font-size:16px; font-weight:600; color:var(--grey-90); }
+  .panel-head .x{ margin-left:auto; font-size:20px; color:var(--grey-50); cursor:pointer; line-height:1; background:none; border:none; padding:0 2px; }
+  .panel-body{ padding:8px 18px 20px; overflow-y:auto; }
+  .pref{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:11px 0; }
+  .pref-txt{ max-width:83%; }
+  .pref-title{ font-size:16px; font-weight:500; color:var(--secondary); line-height:1.3; }
+  .pref-desc{ font-size:14px; color:var(--grey-50); line-height:1.35; margin-top:2px; }
+
+  /* iOS-style switch (Radix Switch parity: h-5 w-9, off grey-50, on primary, 18px thumb) */
+  .sw{ position:relative; flex-shrink:0; width:36px; height:20px; border-radius:9999px;
+    background:var(--grey-50); border:none; cursor:pointer; transition:background .12s; margin-top:2px; padding:0; }
+  .sw[data-on="true"]{ background:var(--primary); }
+  .sw .knob{ position:absolute; top:1px; left:1px; width:18px; height:18px; border-radius:9999px;
+    background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.25); transition:transform .1s; }
+  .sw[data-on="true"] .knob{ transform:translateX(17px); }
+
+  .save-btn{ margin-top:14px; font-size:14px; font-weight:500; padding:7px 16px; border-radius:4px;
+    border:none; background:var(--grey-20); color:var(--grey-50); cursor:not-allowed; transition:all .12s; }
+  .save-btn.enabled{ background:var(--primary); color:#fff; cursor:pointer; }
+  .save-btn.enabled:hover{ background:var(--primary-dark); }
+  .save-note{ font-size:14px; color:var(--grey-90); margin-top:16px; }
+  .save-note b{ font-weight:600; }
+  .saved-flash{ font-size:13px; color:#0b7a09; margin-top:10px; display:none; }
+  .saved-flash.show{ display:block; }
+
+  /* ============ required prototype chrome ============ */
+  .proto-bar{ position:fixed; top:0; left:0; right:0; z-index:200; height:32px; background:#243442;
+    display:flex; align-items:center; justify-content:center; padding:0 16px; gap:10px; user-select:none; }
+  .proto-badge{ position:absolute; left:16px; top:50%; transform:translateY(-50%); background:none; padding:0;
+    color:#f27e31; font-size:15px; font-weight:800; letter-spacing:1px; text-transform:uppercase; }
+  .proto-build{ flex-shrink:0; color:rgba(255,255,255,0.5); font-size:11px; font-weight:600; letter-spacing:0.4px; }
+  .proto-desc{ font-size:12px; color:rgba(255,255,255,0.65); white-space:nowrap; padding:2px 6px; }
+  .proto-actions{ position:absolute; right:12px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:8px; }
+  .proto-about-btn{ border:1px solid rgba(255,255,255,0.3); background:transparent; color:rgba(255,255,255,0.85);
+    font-size:11px; font-weight:600; letter-spacing:0.3px; padding:3px 12px; border-radius:12px; cursor:pointer; transition:background 0.12s; }
+  .proto-about-btn:hover{ background:rgba(255,255,255,0.15); color:#fff; }
+  .proto-fb-btn{ border:1px solid rgba(255,255,255,0.3); background:transparent; color:#fff;
+    font-size:11px; font-weight:600; letter-spacing:0.3px; padding:3px 12px; border-radius:12px; cursor:pointer;
+    transition:background 0.12s; animation:fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse{ 0%,100%{ background:rgba(242,126,49,0); border-color:rgba(255,255,255,0.3); box-shadow:0 0 0 0 rgba(242,126,49,0.55);} 50%{ background:#f27e31; border-color:#f27e31; box-shadow:0 0 0 5px rgba(242,126,49,0);} }
+  .proto-fb-btn:hover{ animation:none; background:rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce){ .proto-fb-btn{ animation:none; } }
+  .info-panel{ display:none; position:fixed; top:32px; right:0; width:340px; background:#fff;
+    border:1px solid #d2d4d7; border-left:none; border-bottom-left-radius:8px; padding:16px; z-index:199;
+    box-shadow:0 4px 16px rgba(0,0,0,0.15); font-size:13px; color:#393b3d; line-height:1.5;
+    max-height:calc(100vh - 40px); overflow-y:auto; }
+  .info-panel.open{ display:block; }
+  .info-panel-title{ font-size:14px; font-weight:600; color:#1d1e20; margin-bottom:12px; }
+  .info-panel-section{ margin-bottom:10px; }
+  .info-panel-section strong{ font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888c90; display:block; margin-bottom:4px; }
+  .info-panel-section p, .info-panel-section ul{ margin:0; padding:0; }
+  .info-panel-section ul{ padding-left:16px; }
+  .info-panel-section li{ margin-bottom:3px; }
+  .info-panel-details{ margin-top:12px; border-top:1px solid #e9eaeb; padding-top:10px; }
+  .info-panel-details summary{ font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#888c90; font-weight:700; cursor:pointer; list-style:none; display:flex; align-items:center; gap:6px; }
+  .info-panel-details summary::-webkit-details-marker{ display:none; }
+  .info-panel-details summary::before{ content:"\25B8"; font-size:9px; transition:transform 0.1s; }
+  .info-panel-details[open] summary::before{ transform:rotate(90deg); }
+  .info-panel-details .grp{ margin-top:9px; }
+  .info-panel-details .grp > b{ display:block; font-size:11px; font-weight:600; color:#54585b; margin-bottom:3px; }
+  .info-panel-details ul{ padding-left:16px; margin:0; }
+  .info-panel-details li{ margin-bottom:2px; font-size:12px; line-height:1.4; }
+  .info-panel-details .note{ color:#888c90; font-style:italic; }
+  .fb-pane{ display:none; position:fixed; top:32px; right:0; bottom:0; width:440px; max-width:92vw; background:#fff;
+    border-left:1px solid #d2d4d7; box-shadow:-4px 4px 16px rgba(0,0,0,0.15); z-index:199; flex-direction:column; overflow:hidden; }
+  .fb-pane.open{ display:flex; }
+  .fb-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e9eaeb; font-size:13px; color:#393b3d; flex-shrink:0; }
+  .fb-head b{ color:#1d1e20; }
+  .fb-close{ border:none; background:none; font-size:20px; line-height:1; color:#888c90; cursor:pointer; padding:0 4px; }
+  .fb-close:hover{ color:#1d1e20; }
+  .fb-frame{ flex:1; width:100%; border:none; }
+  .fb-newtab{ display:block; padding:8px 16px; border-top:1px solid #e9eaeb; font-size:12px; color:#196fe0; text-decoration:none; flex-shrink:0; }
+  .fb-newtab:hover{ text-decoration:underline; }
+</style>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Intelligence — Notification Preferences</span>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Intelligence — Notification Preferences</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>Give the Intelligence tab its own notification opt-in, reusing the exact sub-tab + preferences pattern Utilities already has. Does this placement and these toggles match what a PM needs for paving/conflict alerts?</p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li>Intelligence now expands to a <b>Notifications</b> sub-tab, just like Utilities</li>
+    <li>The preferences panel is the same component shape as the Utilities one (title/description + switch, Save, per-project note)</li>
+    <li>A single opt-in flag for now: <b>New Paving Data</b></li>
+    <li>Save Preferences stays disabled until something changes</li>
+  </ul></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b002</b> — single "New Paving Data" flag</li><li><b>b001</b> — initial build</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Add an <code>intelligence</code> notifications block to the project-member preferences model (parallel to <code>civilsearch</code>)</li>
+      <li>Define the New Paving Data notification event (new paving/moratorium data loaded within the project boundary)</li>
+      <li>Wire intelligence events into the notification delivery pipeline</li>
+    </ul></div>
+    <div class="grp"><b>Left nav</b><ul>
+      <li>Add <code>childItems</code> Notifications to the Intelligence NavItem (mirror Utilities)</li>
+      <li>Add <code>/intelligence/notifications</code> route + sub-tab page</li>
+    </ul></div>
+    <div class="grp"><b>Preferences UI</b><ul>
+      <li>Build Intelligence Notification Preferences form (reuse the Utilities notifications component)</li>
+      <li>Persist + load per-member intelligence prefs (GET/PATCH)</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Start with the single New Paving Data flag; add more intelligence toggles later? <span class="note">(Nathan / Seth)</span></li>
+      <li>Per-project only, or also an org/account-level default? <span class="note">(open)</span></li>
+      <li>Does a non-member see the same "join the project" empty state as Utilities? <span class="note">(confirm)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<div class="app">
+  <!-- top nav -->
+  <div class="topnav">
+    <div class="tn-left">
+      <span class="wordmark">CivilGrid</span>
+      <span class="tn-projects">Projects &#9662;</span>
+    </div>
+    <div class="tn-center"><span class="muted">ACME Engin&hellip;</span> &nbsp;/&nbsp; <b>001 2024 Main Replacement</b> &#9662;</div>
+    <div class="tn-right">
+      <span class="tn-ico"></span>
+      <span class="tn-ico"></span>
+      <span class="avatar">NS</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- left nav -->
+    <div class="leftnav">
+      <div class="proj-card">
+        <div class="proj-bar"></div>
+        <div>
+          <div class="proj-name">001 2024 Main Replacement</div>
+          <div class="proj-pm">PM: A. Rivera</div>
+          <span class="badge-proj">Project</span>
+        </div>
+      </div>
+      <div class="nav-div"></div>
+
+      <div class="nav-sec">Analysis</div>
+      <!-- Utilities: parent w/ children, collapsed (not active) -->
+      <div class="nav-item" onclick="selectUtilities()">Utilities</div>
+      <div class="nav-item">Land Rights</div>
+      <div class="nav-item">Zoning</div>
+      <div class="nav-item">Antenna Map</div>
+      <div class="nav-item">Environmental Study Data</div>
+      <div class="nav-item">Geotechnical</div>
+      <div class="nav-item">Environmental</div>
+      <div class="nav-item">Field Notes</div>
+      <div class="nav-item">Potholing</div>
+
+      <!-- Intelligence: parent active + expanded, Notifications child selected (THE CHANGE) -->
+      <div class="nav-item active" id="nav-intel">Intelligence <span class="beta">Beta</span></div>
+      <div class="nav-children" id="intel-children">
+        <div class="nav-child active" id="nav-intel-notif" onclick="openPanel()">Notifications</div>
+      </div>
+
+      <div class="nav-item">Proposal Packet</div>
+
+      <div class="nav-sec" style="margin-top:8px;">CivilDraw</div>
+      <div class="nav-item">Routing Alternatives</div>
+      <div class="nav-item">Phase 2</div>
+      <div class="nav-item">Test</div>
+      <div class="nav-item">Site Laydown Plan</div>
+      <div class="nav-item">Routing Alternatives V2</div>
+      <div class="nav-item">Routing Map</div>
+      <div class="nav-item">Wetland Delineation</div>
+    </div>
+
+    <!-- map -->
+    <div class="map">
+      <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <rect x="0" y="0" width="1200" height="800" fill="#ececec"/>
+        <!-- roads -->
+        <g stroke="#f7f7f7" stroke-width="26" fill="none">
+          <path d="M-20 250 L1220 210"/><path d="M-20 540 L1220 580"/>
+          <path d="M300 -20 L260 820"/><path d="M760 -20 L800 820"/>
+        </g>
+        <!-- buildings -->
+        <g fill="#e2e3e4">
+          <rect x="60" y="300" width="80" height="60" rx="3"/><rect x="160" y="290" width="70" height="70" rx="3"/>
+          <rect x="70" y="380" width="60" height="50" rx="3"/><rect x="150" y="380" width="90" height="55" rx="3"/>
+          <rect x="360" y="300" width="100" height="70" rx="3"/><rect x="480" y="290" width="80" height="80" rx="3"/>
+          <rect x="370" y="400" width="120" height="60" rx="3"/><rect x="520" y="410" width="70" height="55" rx="3"/>
+          <rect x="860" y="280" width="90" height="70" rx="3"/><rect x="970" y="300" width="110" height="60" rx="3"/>
+          <rect x="880" y="400" width="80" height="60" rx="3"/><rect x="980" y="400" width="100" height="70" rx="3"/>
+          <rect x="120" y="620" width="110" height="60" rx="3"/><rect x="260" y="640" width="80" height="60" rx="3"/>
+          <rect x="420" y="630" width="100" height="70" rx="3"/><rect x="600" y="120" width="90" height="60" rx="3"/>
+          <rect x="720" y="130" width="80" height="70" rx="3"/><rect x="900" y="620" width="120" height="70" rx="3"/>
+          <rect x="1050" y="630" width="90" height="60" rx="3"/><rect x="60" y="120" width="90" height="60" rx="3"/>
+        </g>
+        <!-- utility lines -->
+        <g fill="none" stroke-width="2.4">
+          <path d="M0 240 L1200 205" stroke="#37a04a"/>
+          <path d="M0 270 L1200 235" stroke="#f0b429"/>
+          <path d="M0 555 L1200 595" stroke="#1c7ed6"/>
+          <path d="M315 0 L275 800" stroke="#e8590c"/>
+          <path d="M775 0 L815 800" stroke="#37a04a"/>
+          <path d="M0 590 L1200 630" stroke="#e03131" stroke-dasharray="2 6"/>
+          <path d="M150 0 L120 800" stroke="#1c7ed6"/>
+        </g>
+        <!-- project boundary (orange dashed) -->
+        <path d="M330 260 L640 300 L660 520 L470 640 L300 470 Z"
+              fill="rgba(242,126,49,0.04)" stroke="#f06b1f" stroke-width="3" stroke-dasharray="11 9" stroke-linejoin="round"/>
+      </svg>
+
+      <div class="layers-btn"><span class="stack"></span> Layers</div>
+      <div class="map-ctrl">
+        <button title="Locate">&#9678;</button>
+        <button title="Measure">&#9776;</button>
+        <button title="Zoom in" onclick="return false;">+</button>
+        <button title="Zoom out" onclick="return false;">&minus;</button>
+      </div>
+      <div class="map-scale">100 ft<div class="bar"></div></div>
+      <div class="map-attr">&copy; Mapbox &copy; OpenStreetMap</div>
+
+      <!-- Notification Preferences panel -->
+      <div class="panel" id="panel">
+        <div class="panel-head">
+          <span class="chev" onclick="closePanel()" title="Back">&#8249;</span>
+          <span class="title">Notification Preferences</span>
+          <button class="x" onclick="closePanel()" aria-label="Close">&times;</button>
+        </div>
+        <div class="panel-body">
+          <div class="pref">
+            <div class="pref-txt"><div class="pref-title">New Paving Data</div><div class="pref-desc">When new paving or moratorium data is loaded within your project boundary</div></div>
+            <button class="sw" data-on="true" onclick="flip(this)"><span class="knob"></span></button>
+          </div>
+
+          <button class="save-btn" id="save-btn" onclick="savePrefs()">Save Preferences</button>
+          <div class="saved-flash" id="saved-flash">&#10003; Preferences saved for this project.</div>
+          <div class="save-note"><b>Note:</b> These preferences apply only to this project.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+// ===== prototype interactions =====
+let dirty = false;
+function markDirty(){
+  dirty = true;
+  const b = document.getElementById('save-btn');
+  b.classList.add('enabled');
+  document.getElementById('saved-flash').classList.remove('show');
+}
+function flip(el){
+  const on = el.getAttribute('data-on') === 'true';
+  el.setAttribute('data-on', String(!on));
+  markDirty();
+}
+function savePrefs(){
+  if (!dirty) return;
+  dirty = false;
+  const b = document.getElementById('save-btn');
+  b.classList.remove('enabled');
+  document.getElementById('saved-flash').classList.add('show');
+}
+function openPanel(){
+  document.getElementById('panel').classList.remove('hidden');
+  document.getElementById('nav-intel-notif').classList.add('active');
+  window.__activeScreen = 'Intelligence / Notification Preferences';
+}
+function closePanel(){
+  document.getElementById('panel').classList.add('hidden');
+  window.__activeScreen = 'Intelligence (map)';
+}
+// Utilities is shown only to make the parallel obvious; its own panel is out of scope here.
+function selectUtilities(){
+  alert("In the real app this opens Utilities → Reports / Notifications.\nThis prototype focuses on the new Intelligence → Notifications sub-tab.");
+}
+
+// ===== required prototype chrome =====
+const BUILD = 2;
+const BUILD_DATE = "Jun 22, 2026";
+const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+function toggleInfo(){
+  const ip = document.getElementById('info-panel');
+  const willOpen = !ip.classList.contains('open');
+  ip.classList.toggle('open');
+  if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+}
+
+const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+const PROTOTYPE_NAME = "Intelligence — Notification Preferences";
+window.__activeScreen = window.__activeScreen || 'Intelligence / Notification Preferences';
+
+function fbUrl(embedded){
+  const u = new URL(FEEDBACK_FORM_BASE);
+  if (embedded) u.searchParams.set("embedded", "true");
+  u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+  u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+  u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+  return u.toString();
+}
+function fbOpen(){
+  document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+  document.getElementById('fb-frame').src = fbUrl(true);
+  document.getElementById('fb-newtab').href = fbUrl(false);
+  document.getElementById('info-panel').classList.remove('open');
+  document.getElementById('fb-pane').classList.add('open');
+}
+function fbClose(){ document.getElementById('fb-pane').classList.remove('open'); }
+document.getElementById('fb-open').onclick = fbOpen;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fbClose(); });
+</script>
