@@ -1,6 +1,7 @@
 <!--
-  BUILD b002 · Jun 22, 2026
+  BUILD b003 · Jun 22, 2026
   Build history (newest first):
+    b003 · Jun 22, 2026 — renamed "Outreach Status" → "Research Status"; new states (Not Started / In Progress / Done — New Data / Done — No Data Provided / Done — Changes Received)
     b002 · Jun 22, 2026 — compact email toggle top-right; 3 cards on one line; progress bar below cards; standard table controls
     b001 · Jun 22, 2026 — initial build (Conflicts Summary + linked Paving Data Refresh Status page, from the 6/22 Adam/Sam meeting)
   To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
@@ -89,12 +90,11 @@
   /* status chips (refresh page) */
   .st{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:500; padding:3px 9px; border-radius:9999px; }
   .st::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:0.85; }
-  .st-received{ background:var(--green-20); color:var(--green-60); }
+  .st-notstarted{ background:transparent; border:1px solid var(--grey-30); color:var(--grey-60); }
+  .st-inprogress{ background:var(--blue-20); color:var(--blue-60); }
+  .st-newdata{ background:var(--green-20); color:var(--green-60); }
   .st-changes{ background:var(--yellow-20); color:var(--amber-tx); }
-  .st-followed{ background:#ffe2c2; color:#b5651d; }
-  .st-sent{ background:var(--blue-20); color:var(--blue-60); }
-  .st-none{ background:var(--grey-20); color:var(--grey-70); }
-  .st-nodata{ background:var(--red-20); color:var(--red-60); }
+  .st-nodata{ background:var(--grey-20); color:var(--grey-70); }
 
   /* progress header */
   .progress-card{ background:#fff; border:1px solid var(--grey-20); border-radius:8px; padding:18px 20px; margin-bottom:18px; }
@@ -209,17 +209,17 @@
   <div class="info-panel-section"><strong>Purpose</strong><p>From the 6/22 Adam/Sam meeting: give program managers a status page showing how far along CivilGrid is on the quarterly paving/moratoria data refresh across the service territory — reachable from where conflicts already live.</p></div>
   <div class="info-panel-section"><strong>What to notice</strong><ul>
     <li>The <b>Data Refresh Status</b> link sits on the Conflicts Summary page (click it to cross over)</li>
-    <li>Top meta progress tracker (“50% complete”) + per-jurisdiction outreach status chips</li>
+    <li>Top meta progress tracker (“50% complete”) + per-jurisdiction research status chips</li>
     <li>Notes cells are <b>admin-editable</b> (click one and type) — Adam's ask</li>
     <li>Opt-in toggle for the monthly summary email that replaces the spreadsheet to the program manager</li>
   </ul></div>
-  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b002</b> — compact email toggle, cards on one line, progress bar below, standard table controls</li><li><b>b001</b> — initial build</li></ul></details>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b003</b> — "Research Status" rename + new states</li><li><b>b002</b> — layout + standard controls</li><li><b>b001</b> — initial build</li></ul></details>
   <details class="info-panel-details">
     <summary>If we build this — Linear issues</summary>
     <div class="grp"><b>Foundation / data model</b><ul>
       <li>Derive per-jurisdiction last-refresh date from existing load timestamps</li>
-      <li>Model outreach status per jurisdiction (No Outreach / Sent / Followed Up / Received / Received–Changes / No Data)</li>
-      <li>Per-jurisdiction admin-editable notes field (static facts + outreach notes)</li>
+      <li>Model research status per jurisdiction (Not Started / In Progress / Done — New Data / Done — No Data Provided / Done — Changes Received)</li>
+      <li>Per-jurisdiction admin-editable notes field (static facts + research notes)</li>
       <li>Compute projects-impacted per jurisdiction via spatial join to project boundaries</li>
     </ul></div>
     <div class="grp"><b>Status page UI</b><ul>
@@ -232,7 +232,7 @@
       <li>Per-org feature flag / service-territory scoping</li>
     </ul></div>
     <div class="grp"><b>Decisions &amp; spikes</b><ul>
-      <li>Chunky status first vs. granular outreach detail <span class="note">(meeting: start chunky)</span></li>
+      <li>Chunky status first vs. granular research detail <span class="note">(meeting: start chunky)</span></li>
       <li>Admin edit surface for notes — inline vs. separate admin view <span class="note">(Adam)</span></li>
       <li>Is this org-level (territory) or also project-scoped? <span class="note">(open)</span></li>
     </ul></div>
@@ -339,14 +339,14 @@
         <table>
           <thead class="cols">
             <tr>
-              <th>Jurisdiction</th><th>Type</th><th>Last Refresh</th><th>Outreach Status</th><th>Projects Impacted</th><th>Notes (editable)</th>
+              <th>Jurisdiction</th><th>Type</th><th>Last Refresh</th><th>Research Status</th><th>Projects Impacted</th><th>Notes (editable)</th>
             </tr>
           </thead>
           <tbody id="rs-rows"></tbody>
         </table>
       </div>
 
-      <div class="note-foot"><b>Note:</b> Last-refresh dates come from loaded data automatically; outreach status and notes are maintained by your CivilGrid team.</div>
+      <div class="note-foot"><b>Note:</b> Last-refresh dates come from loaded data automatically; research status and notes are maintained by your CivilGrid team.</div>
     </div>
 
   </div>
@@ -385,21 +385,21 @@ document.getElementById('cs-rows').innerHTML = CS.map(r => `<tr>
   <td>${r[13]}</td><td>${r[14]}</td><td>${r[15]}</td><td>${r[16]}</td>
 </tr>`).join('');
 
-const ST_CLASS = { received:'st-received', changes:'st-changes', followed:'st-followed', sent:'st-sent', none:'st-none', nodata:'st-nodata' };
-const ST_LABEL = { received:'Received', changes:'Received — Changes', followed:'Followed Up', sent:'Sent', none:'No Outreach', nodata:'No Data' };
+const ST_CLASS = { notstarted:'st-notstarted', inprogress:'st-inprogress', newdata:'st-newdata', changes:'st-changes', nodata:'st-nodata' };
+const ST_LABEL = { notstarted:'Not Started', inprogress:'In Progress', newdata:'Done — New Data', changes:'Done — Changes Received', nodata:'Done — No Data Provided' };
 const RS = [
   ['San Jose','City','Jun 18, 2026','changes','9','5-year moratorium added on the N. Blackstone corridor'],
-  ['Oakland','City','Jun 15, 2026','received','5','Provides data via public portal only'],
-  ['Sunnyvale','City','Jun 12, 2026','received','3',''],
-  ['Fremont','City','Jun 10, 2026','received','2',''],
-  ['Santa Clara County','County','Jun 9, 2026','received','4',''],
-  ['Mountain View','City','Jun 5, 2026','received','1',''],
-  ['Hayward','City','—','followed','—','Followed up twice, no response'],
-  ['Alameda County','County','—','sent','—',''],
-  ['Berkeley','City','—','sent','—',''],
+  ['Oakland','City','Jun 15, 2026','newdata','5','Provides data via public portal only'],
+  ['Sunnyvale','City','Jun 12, 2026','newdata','3',''],
+  ['Fremont','City','Jun 10, 2026','newdata','2',''],
+  ['Santa Clara County','County','Jun 9, 2026','newdata','4',''],
+  ['Mountain View','City','Jun 5, 2026','newdata','1',''],
+  ['Hayward','City','—','inprogress','—','Followed up twice, no response'],
+  ['Alameda County','County','—','inprogress','—',''],
+  ['Berkeley','City','—','inprogress','—',''],
   ['Palo Alto','City','Mar 2026','nodata','0','Same document as last quarter — no change'],
-  ['Milpitas','City','—','none','—',''],
-  ['Redwood City','City','—','none','—',''],
+  ['Milpitas','City','—','notstarted','—',''],
+  ['Redwood City','City','—','notstarted','—',''],
 ];
 document.getElementById('rs-rows').innerHTML = RS.map(r => `<tr>
   <td style="font-weight:500;">${r[0]}</td>
@@ -420,7 +420,7 @@ function showScreen(which){
 function flip(el){ el.setAttribute('data-on', String(el.getAttribute('data-on')!=='true')); }
 
 // ===== required prototype chrome =====
-const BUILD = 2;
+const BUILD = 3;
 const BUILD_DATE = "Jun 22, 2026";
 const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
 document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
