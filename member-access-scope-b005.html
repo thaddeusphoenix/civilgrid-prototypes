@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  BUILD b005 · Jun 23, 2026
+  Build history (newest first):
+    b005 · Jun 23, 2026 — removed bulk select/apply from Members (Nathan). Genericized all customer data
+      (fictional org "Northwind Energy", fictional members/emails on .example domains, fictional customer
+      values) for public hosting; CivilGrid branding kept. First public build.
+    b004 · Jun 23, 2026 — added the "Access" left-nav tab (Nathan's name, not "Scopes"): an admin setup
+      page that defines the four fields (Region geospatial / Division / Customer / Project Type) and their
+      allowed values (add/remove inline). Left nav now switches Members <-> Access; the values defined
+      here feed the invite flow + member/bulk scope editors live.
+    b003 · Jun 23, 2026 — invite flow first (Nathan reprioritized; bulk parked). "Invite Team" now opens
+      the real production "Invite Team Members" dialog (multi-email add) extended with Role + Access Scope,
+      so invitees arrive pre-scoped. Newly invited people land in Pending invites carrying their scope
+      (instead of "Set on accept"). Bulk select/apply from b002 left in place but no longer the focus.
+    b002 · Jun 23, 2026 — addressed scale-of-scoping (Forge's note): Organization Members rows now have
+      checkboxes + a select-all; selecting members shows a bulk bar ("N members selected · Set scope")
+      that opens the scope editor and applies the chosen scope to all selected at once. So admins don't
+      hand-scope one member at a time. (Bulk approach chosen by Nathan over default-per-role / invite-time.)
+    b001 · Jun 23, 2026 — initial build. Members tab as the home for access control. Models the real
+      Members page (Organization Members / Guest Members / Pending invites / CivilGrid Support, Invite Team,
+      hover-gear → Edit User dialog) from webapp source (packages/client/src/pages/organization/members/).
+      Adds an Access Scope column + a structured scope section in the Edit User dialog: four fields
+      (Region geospatial / Division / Customer / Project Type) define which projects a member sees — the
+      generalization of today's all-projects vs. hand-picked Guest "subset of projects". Role stays the
+      capability bundle; scope is per-member. Companion to access-control-roles-permissions-b004 (the
+      faithful Roles & Permissions repro where this scope idea was first tried, then moved here).
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Member Access Scope — Members</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Noto Sans", system-ui, -apple-system, sans-serif; background: #f4f5f5; color: #1d1e20; padding-top: 32px; font-size: 14px; }
+
+  /* ===== Prototype bar ===== */
+  .proto-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 32px; background: #243442; display: flex; align-items: center; justify-content: center; padding: 0 16px; gap: 10px; user-select: none; }
+  .proto-badge { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: none; padding: 0; color: #f27e31; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .proto-build { flex-shrink: 0; color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  .proto-desc { font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; padding: 2px 6px; }
+  .proto-actions { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+  .proto-about-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; animation: fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse { 0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); } 50% { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); } }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+
+  .info-panel { display: none; position: fixed; top: 32px; right: 0; width: 340px; background: #ffffff; border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px; padding: 16px; z-index: 199; box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px; color: #393b3d; line-height: 1.5; max-height: calc(100vh - 40px); overflow-y: auto; }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  .fb-pane { display: none; position: fixed; top: 32px; right: 0; bottom: 0; width: 440px; max-width: 92vw; background: #fff; border-left: 1px solid #d2d4d7; box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199; flex-direction: column; overflow: hidden; }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+
+  /* ===== Top nav ===== */
+  .top-nav { position: sticky; top: 32px; z-index: 100; height: 48px; background: #ffffff; border-bottom: 1px solid #d2d4d7; display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+  .logo { color: #f27e31; font-size: 18px; font-weight: 800; letter-spacing: 1px; }
+  .nav-page { font-size: 14px; color: #393b3d; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .nav-page .chev { font-size: 10px; color: #888c90; }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+  .nav-ico { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #888c90; color: #888c90; font-size: 12px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+  .nav-badge { position: absolute; top: -6px; right: -6px; background: #d61e17; color: #fff; font-size: 9px; font-weight: 700; min-width: 15px; height: 15px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 3px; border: 1.5px solid #fff; }
+  .nav-avatar { width: 28px; height: 28px; border-radius: 50%; background: #243442; color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+
+  /* ===== Layout ===== */
+  .shell { display: flex; min-height: calc(100vh - 80px); }
+  .left-nav { width: 224px; flex-shrink: 0; background: #fff; border-right: 1px solid #d2d4d7; padding: 16px 0; }
+  .ln-back { display: flex; align-items: center; gap: 6px; color: #196fe0; font-size: 14px; padding: 4px 20px 14px; cursor: pointer; }
+  .ln-org { display: flex; align-items: center; gap: 10px; padding: 0 20px 16px; }
+  .ln-org-bar { width: 3px; height: 22px; background: #f27e31; border-radius: 2px; }
+  .ln-org-name { font-size: 16px; font-weight: 600; color: #1d1e20; }
+  .ln-item { display: flex; align-items: center; padding: 8px 20px; font-size: 14px; color: #1d1e20; cursor: pointer; }
+  .ln-item:hover { background: #e9eaeb; }
+  .ln-item.active { background: #eaf5ff; color: #134a91; font-weight: 500; box-shadow: inset 2px 0 0 #196fe0; }
+  .ln-section { font-size: 13px; font-weight: 500; color: #656e75; padding: 16px 20px 6px; }
+
+  .main { flex: 1; padding: 24px 36px 60px; min-width: 0; }
+  .btn { font-family: inherit; font-size: 14px; font-weight: 500; border-radius: 4px; padding: 7px 14px; cursor: pointer; border: 1px solid transparent; }
+  .btn-primary { background: #243442; color: #fff; }
+  .btn-primary:hover { background: #1f2c38; }
+  .btn-hollow { background: #fff; color: #393b3d; border-color: #d2d4d7; }
+  .btn-hollow:hover { background: #f4f5f5; }
+  .btn-danger { background: #fff; color: #d61e17; border-color: #f5cdcb; }
+  .btn-danger:hover { background: #ffefee; }
+
+  .invite-bar { margin-bottom: 22px; }
+
+  /* Access setup page */
+  .access-head { margin-bottom: 18px; max-width: 760px; }
+  .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 900px; }
+  .field-card { background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; padding: 16px; }
+  .fc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .fc-name { font-size: 15px; font-weight: 600; color: #1d1e20; }
+  .fc-flag { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 9999px; }
+  .fc-flag.geo { background: #c8f5d2; color: #0b7a09; }
+  .fc-flag.list { background: #e9eaeb; color: #54585b; }
+  .fc-desc { font-size: 12px; color: #656e75; line-height: 1.45; margin-bottom: 12px; }
+  .acc-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .acc-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; padding: 3px 5px 3px 10px; border-radius: 9999px; background: #f4f5f5; border: 1px solid #d2d4d7; color: #393b3d; }
+  .acc-chip.geo { background: #e8fcec; border-color: #c8f5d2; color: #0b7a09; }
+  .acc-chip-x { border: none; background: none; color: #888c90; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+  .acc-chip-x:hover { color: #d61e17; }
+  .acc-add { font-size: 12px; padding: 3px 10px; border-radius: 9999px; background: #fff; border: 1px dashed #babdc0; color: #888c90; cursor: pointer; }
+  .acc-add:hover { border-color: #196fe0; color: #196fe0; }
+  .acc-input { font-family: inherit; font-size: 12px; padding: 3px 9px; border: 1px solid #196fe0; border-radius: 9999px; outline: none; width: 150px; }
+
+  .sec { margin-bottom: 34px; }
+  .sec-h { font-size: 16px; font-weight: 600; color: #1d1e20; }
+  .sec-d { font-size: 13px; color: #656e75; margin: 2px 0 12px; }
+
+  table.members { width: 100%; border-collapse: collapse; }
+  table.members th { text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: #888c90; padding: 6px 12px 8px 0; border-bottom: 1px solid #e9eaeb; }
+  table.members td { font-size: 14px; color: #1d1e20; padding: 11px 12px 11px 0; border-bottom: 1px solid #f0f1f1; vertical-align: middle; }
+  table.members tr:hover td { background: #fafbfb; }
+  .col-chk { width: 34px; padding-right: 0; }
+  .col-chk input { width: 16px; height: 16px; cursor: pointer; accent-color: #243442; }
+  .col-name { width: 19%; font-weight: 500; }
+  .col-email { width: 24%; color: #54585b; }
+  .col-role { width: 16%; }
+  .col-scope { width: 30%; }
+  .col-act { width: 6%; text-align: right; }
+
+  /* bulk action bar */
+  .bulk-bar { display: none; align-items: center; justify-content: space-between; gap: 12px; background: #eaf5ff; border: 1px solid #c0dbfe; border-radius: 6px; padding: 8px 14px; margin-bottom: 10px; }
+  .bulk-bar.show { display: flex; }
+  .bulk-bar #bulk-count { font-size: 13px; font-weight: 600; color: #134a91; }
+  .bulk-actions { display: flex; gap: 8px; }
+  .btn-sm { font-size: 12px; padding: 5px 12px; }
+  .role-pill { font-size: 12px; padding: 3px 9px; border-radius: 9999px; background: #e9eaeb; color: #393b3d; white-space: nowrap; }
+
+  .scope-cell { display: flex; flex-wrap: wrap; gap: 5px; }
+  .scope-all { font-size: 12px; padding: 3px 9px; border-radius: 9999px; background: #eaf5ff; border: 1px solid #c0dbfe; color: #134a91; font-weight: 500; }
+  .scope-chip { font-size: 12px; padding: 3px 9px; border-radius: 9999px; background: #f4f5f5; border: 1px solid #d2d4d7; color: #393b3d; white-space: nowrap; }
+  .scope-chip .k { color: #888c90; }
+  .scope-chip.geo { background: #e8fcec; border-color: #c8f5d2; color: #0b7a09; }
+  .scope-muted { font-size: 13px; color: #babdc0; }
+
+  .gear { width: 28px; height: 28px; border-radius: 4px; border: 1px solid #d2d4d7; background: #fff; color: #54585b; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.1s; }
+  table.members tr:hover .gear { opacity: 1; }
+  .gear:hover { background: #f4f5f5; }
+  .pending-act { display: flex; gap: 8px; justify-content: flex-end; opacity: 0; transition: opacity 0.1s; }
+  table.members tr:hover .pending-act { opacity: 1; }
+  .btn-xs { font-size: 12px; padding: 4px 10px; border-radius: 4px; cursor: pointer; border: 1px solid #d2d4d7; background: #fff; color: #393b3d; }
+  .btn-xs.danger { color: #d61e17; border-color: #f5cdcb; }
+
+  /* invite dialog */
+  .inv-input { width: 100%; font-family: inherit; font-size: 14px; padding: 9px 11px; border: 1px solid #d2d4d7; border-radius: 4px; outline: none; color: #1d1e20; }
+  .inv-input::placeholder { color: #888c90; }
+  .inv-input:focus { border-color: #196fe0; }
+  .inv-help { font-size: 12px; color: #656e75; margin-top: 7px; line-height: 1.45; }
+  .inv-emails { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .inv-email-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; background: #eaf5ff; border: 1px solid #c0dbfe; color: #134a91; border-radius: 9999px; padding: 3px 6px 3px 11px; }
+  .inv-email-chip button { border: none; background: none; color: #5a7fa8; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+  .inv-email-chip button:hover { color: #d61e17; }
+  .btn-primary:disabled { opacity: 0.45; cursor: default; }
+
+  /* ===== Edit User modal ===== */
+  .scrim { display: none; position: fixed; inset: 0; background: rgba(29,30,32,0.4); z-index: 300; align-items: flex-start; justify-content: center; padding: 60px 16px; overflow-y: auto; }
+  .scrim.open { display: flex; }
+  .modal { background: #fff; border-radius: 8px; width: 640px; max-width: 96vw; box-shadow: 0 16px 48px rgba(0,0,0,0.25); }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 14px; border-bottom: 1px solid #e9eaeb; }
+  .modal-head .mh-title { font-size: 16px; font-weight: 600; color: #1d1e20; }
+  .modal-close { border: none; background: none; font-size: 22px; color: #888c90; cursor: pointer; line-height: 1; }
+  .modal-close:hover { color: #1d1e20; }
+  .modal-body { padding: 20px 22px; }
+  .mb-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .mb-person .mp-name { font-size: 18px; font-weight: 600; color: #1d1e20; }
+  .mb-person .mp-email { font-size: 13px; color: #656e75; font-style: italic; margin-top: 1px; }
+  .field-label { font-size: 12px; font-weight: 600; color: #393b3d; margin-bottom: 5px; display: block; }
+  .role-select { font-family: inherit; font-size: 14px; color: #1d1e20; padding: 7px 10px; border: 1px solid #d2d4d7; border-radius: 4px; background: #fff; min-width: 200px; }
+
+  .scope-sec { margin-top: 22px; border-top: 1px solid #e9eaeb; padding-top: 18px; }
+  .scope-sec-h { font-size: 14px; font-weight: 600; color: #1d1e20; }
+  .scope-sec-d { font-size: 12px; color: #656e75; margin: 2px 0 14px; line-height: 1.5; }
+  .ed-field { margin-bottom: 15px; }
+  .ed-field-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .ed-field-name { font-size: 13px; font-weight: 600; color: #1d1e20; }
+  .ed-field-mini { font-size: 11px; color: #888c90; }
+  .opts { display: flex; flex-wrap: wrap; gap: 7px; }
+  .opt { font-size: 12px; padding: 5px 12px; border-radius: 9999px; background: #fff; border: 1px solid #d2d4d7; color: #54585b; cursor: pointer; user-select: none; transition: all 0.1s; }
+  .opt:hover { border-color: #888c90; }
+  .opt.on { background: #243442; border-color: #243442; color: #fff; }
+  .opt.all-toggle.on { background: #196fe0; border-color: #196fe0; }
+  .opt.geo::before { content: "\25C8  "; opacity: 0.7; }
+  .ed-summary { background: #eaf5ff; border: 1px solid #c0dbfe; border-radius: 8px; padding: 12px 14px; margin-top: 8px; }
+  .ed-summary .es-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: #5a7fa8; margin-bottom: 5px; }
+  .ed-summary .es-sentence { font-size: 13px; color: #134a91; line-height: 1.55; }
+  .ed-summary .es-sentence b { font-weight: 700; }
+  .modal-foot { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px; border-top: 1px solid #e9eaeb; }
+  .modal-foot .right { display: flex; gap: 10px; }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Member Access Scope — Members</span>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Member Access Scope — Members</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>Where should access control live? This puts it on the member: a person gets a <b>Role</b> (what they can do) plus an <b>Access Scope</b> (which projects they can see) — the structured generalization of today's "all projects" vs. hand-picked Guest "subset of projects."</p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li>The Members page is reproduced from the real source (Organization Members / Guest Members / Pending / CivilGrid Support).</li>
+    <li>New <b>Access Scope</b> column — most members are "All projects," some are scoped by the four structured fields.</li>
+    <li><b>Access tab:</b> the admin page that defines the four fields (Region / Division / Customer / Project Type) and their allowed values — what the invite flow and scope editors pick from. Add/remove values inline.</li>
+    <li><b>Invite flow (focus):</b> "Invite Team" opens the real production dialog (multi-email add) extended with Role + Access Scope, so invitees arrive pre-scoped. They land in Pending invites carrying that scope.</li>
+    <li>Hover a member → the gear opens <b>Edit User</b>: Role dropdown (unchanged) + a new Access Scope section with a live "this person can see…" summary.</li>
+    <li>Guest Members' hand-picked project list becomes structured scope — the same model, just tighter.</li>
+  </ul></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b005</b> — removed bulk from Members; genericized for public hosting</li><li><b>b004</b> — added the Access tab: admin setup of the four fields + their allowed values</li><li><b>b003</b> — invite flow: Invite Team dialog with role + access scope; invitees land pre-scoped</li><li><b>b002</b> — bulk select + apply scope to many members</li><li><b>b001</b> — initial build (Members-tab home for access scope)</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Add structured scope fields (Region, Division, Customer, Project Type) with admin-defined values</li>
+      <li>Anchor Region values to geospatial service-area polygons</li>
+      <li>Tag every project with its four field values; backfill existing projects</li>
+      <li>Add per-member access scope; migrate Guest "subset of projects" to structured scope</li>
+    </ul></div>
+    <div class="grp"><b>Members UI</b><ul>
+      <li>Add Access Scope column to the member tables</li>
+      <li>Add Access Scope section to the Edit User dialog (per-field multi-select + live summary)</li>
+      <li>Bulk-select members + apply one scope to all selected</li>
+      <li>Set scope at invite time in the Invite Team flow</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app (the real change)</b><ul>
+      <li>Filter project visibility by each member's scope server-side</li>
+      <li>Cross-region query support ("all gas transmission in the US")</li>
+      <li>Migration: collapse a customer's multiple orgs into one + map old orgs to member scope</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Confirm cross-region geospatial query architecture works <span class="note">(Nathan → engineering)</span></li>
+      <li>How many scope fields — 4 vs 5? Each is exponentially harder <span class="note">(6/23 meeting)</span></li>
+      <li>Do roles also carry a default scope, or is scope always per-member? <span class="note">(open)</span></li>
+      <li>Socialize the access-control framing before scoping <span class="note">(Nathan → Josh / leadership)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<nav class="top-nav">
+  <span class="logo">CIVILGRID</span>
+  <span class="nav-page">Settings <span class="chev">&#9662;</span></span>
+  <div class="nav-right">
+    <span class="nav-ico">&#128276;<span class="nav-badge">3</span></span>
+    <span class="nav-ico">?</span>
+    <span class="nav-avatar">NS</span>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="left-nav">
+    <div class="ln-back">&#8592; Home</div>
+    <div class="ln-org"><span class="ln-org-bar"></span><span class="ln-org-name">Northwind Energy</span></div>
+    <div class="ln-item">General</div>
+    <div class="ln-item">Plan</div>
+    <div class="ln-item">Billing</div>
+    <div class="ln-section">Team</div>
+    <div class="ln-item active" id="nav-members" onclick="switchView('members')">Members</div>
+    <div class="ln-item">Roles &amp; Permissions</div>
+    <div class="ln-item" id="nav-access" onclick="switchView('access')">Access</div>
+  </aside>
+
+  <main class="main">
+    <div class="invite-bar" id="invite-bar"><button class="btn btn-primary" onclick="openInvite()">Invite Team</button></div>
+    <div id="content"><!-- injected --></div>
+  </main>
+</div>
+
+<!-- Edit User modal -->
+<div class="scrim" id="scrim">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <span class="mh-title" id="mh-title">Edit User</span>
+      <button class="modal-close" onclick="closeEditor()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="mb-top" id="mb-top">
+        <div class="mb-person">
+          <div class="mp-name" id="ed-name">Name</div>
+          <div class="mp-email" id="ed-email">email</div>
+          <div style="margin-top:14px;">
+            <label class="field-label">Role</label>
+            <select class="role-select" id="ed-role" onchange="onRoleChange()">
+              <option>Org Admin</option>
+              <option>Project Manager</option>
+              <option>Engineer/Staff</option>
+              <option>Contractor</option>
+              <option>View-only</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-danger" onclick="removeMember()">Remove from org</button>
+      </div>
+
+      <div class="scope-sec">
+        <div class="scope-sec-h" id="scope-sec-h">Access Scope</div>
+        <div class="scope-sec-d" id="scope-sec-d">Which projects this person can see. Leave a field on <b>All</b> to not restrict by it; the role above controls what they can <i>do</i>.</div>
+        <div id="ed-fields"><!-- injected --></div>
+        <div class="ed-summary">
+          <div class="es-label" id="es-label">This person can see</div>
+          <div class="es-sentence" id="ed-sentence"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span></span>
+      <div class="right">
+        <button class="btn btn-hollow" onclick="closeEditor()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveMember()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Invite Team Members modal -->
+<div class="scrim" id="inv-scrim" onclick="closeInvite()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <span class="mh-title">Invite Team Members</span>
+      <button class="modal-close" onclick="closeInvite()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Add new members to your organization</label>
+      <div class="inv-emails" id="inv-emails"></div>
+      <input class="inv-input" id="inv-input" placeholder="Enter email address to invite" onkeydown="invEmailKey(event)">
+      <div class="inv-help">Enter an email address to invite someone to your organization. You can add multiple people.</div>
+
+      <div style="margin-top:18px;">
+        <label class="field-label">Role</label>
+        <select class="role-select" id="inv-role">
+          <option>Org Admin</option>
+          <option selected>Project Manager</option>
+          <option>Engineer/Staff</option>
+          <option>Contractor</option>
+          <option>View-only</option>
+        </select>
+      </div>
+
+      <div class="scope-sec" style="margin-top:20px;">
+        <div class="scope-sec-h">Access Scope</div>
+        <div class="scope-sec-d">Which projects these invitees can see once they join. Leave a field on <b>All</b> to not restrict by it; the role controls what they can <i>do</i>.</div>
+        <div id="inv-fields"></div>
+        <div class="ed-summary"><div class="es-label">Invitees will see</div><div class="es-sentence" id="inv-sentence"></div></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span></span>
+      <div class="right">
+        <button class="btn btn-hollow" onclick="closeInvite()">Cancel</button>
+        <button class="btn btn-primary" id="inv-send" onclick="sendInvites()" disabled>Invite</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head"><span>Feedback on: <b id="fb-ctx"></b></span><button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button></div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+  // ===== Build stamp =====
+  const BUILD = 5;
+  const BUILD_DATE = "Jun 23, 2026";
+  const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+  document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+  // ===== Scope fields =====
+  const SCOPE_FIELDS = [
+    { key: "region",   name: "Region",       geo: true,  desc: "Service areas drawn on the map. A project belongs to a region by where it sits.", values: ["Colorado", "Minnesota", "Texas", "New Mexico"] },
+    { key: "division", name: "Division",     geo: false, desc: "The org's internal structure. A project can belong to one or more divisions.", values: ["Gas", "Electric", "Land"] },
+    { key: "customer", name: "Customer",     geo: false, desc: "Cross-cuts the hierarchy — e.g. all work for one client, across every region.", values: ["Northstar Telecom", "Vela Networks", "City of Fairmont"] },
+    { key: "type",     name: "Project Type", geo: false, desc: "The kind of work. Often the whole basis of a scope (e.g. only locate work).", values: ["Locate", "Test Holes", "Survey"] },
+  ];
+  function blankScope() { return { region: [], division: [], customer: [], type: [] }; }
+
+  // ===== Member data (fictional — genericized for public hosting) =====
+  const ORG_MEMBERS = [
+    { name: "Dana Whitfield", email: "dwhitfield@meridian-eng.example", role: "Project Manager", scope: { region: ["Colorado"], division: ["Gas"], customer: [], type: [] } },
+    { name: "Marcus Reed",    email: "mreed@meridian-eng.example",      role: "Project Manager", scope: { region: ["Colorado"], division: [], customer: [], type: ["Locate"] } },
+    { name: "Priya Shah",     email: "priya.shah@northwind.example",    role: "Project Manager", scope: blankScope() },
+    { name: "Tom Becker",     email: "tom.becker@northwind.example",    role: "Project Manager", scope: { region: [], division: ["Electric"], customer: [], type: [] } },
+    { name: "Elena Cruz",     email: "elena.cruz@northwind.example",    role: "Project Manager", scope: blankScope() },
+  ];
+  const GUEST_MEMBERS = [
+    { name: "Sofia Marin", email: "smarin@acme-potholing.example", role: "Contractor", scope: { region: ["Texas"], division: [], customer: [], type: ["Test Holes"] } },
+  ];
+  const PENDING = [
+    { name: "ben.taylor@northwind.example",   email: "ben.taylor@northwind.example",   role: "Project Manager" },
+    { name: "brenda.olsen@northwind.example", email: "brenda.olsen@northwind.example", role: "Project Manager" },
+    { name: "c.nichols@meridian-eng.example", email: "c.nichols@meridian-eng.example", role: "Project Manager" },
+    { name: "david.kim@northwind.example",    email: "david.kim@northwind.example",    role: "Project Manager" },
+  ];
+  const CG_SUPPORT = [
+    { name: "CivilGrid Support", email: "support@civilgrid.com", role: "Org Admin", scope: blankScope() },
+  ];
+
+  // group registry so the editor can find & mutate the right member
+  const GROUPS = { org: ORG_MEMBERS, guest: GUEST_MEMBERS, cg: CG_SUPPORT };
+  let active = null; // { group, idx, scope, role }
+
+  // ===== Scope rendering =====
+  function isAll(scope) { return SCOPE_FIELDS.every(f => !scope[f.key] || scope[f.key].length === 0); }
+
+  function scopeCellHtml(scope) {
+    if (isAll(scope)) return '<div class="scope-cell"><span class="scope-all">All projects</span></div>';
+    let chips = "";
+    SCOPE_FIELDS.forEach(f => {
+      const v = scope[f.key];
+      if (v && v.length) {
+        chips += '<span class="scope-chip ' + (f.geo ? "geo" : "") + '"><span class="k">' + f.name + ':</span> ' + v.join(", ") + '</span>';
+      }
+    });
+    return '<div class="scope-cell">' + chips + '</div>';
+  }
+
+  // ===== Table builders =====
+  function memberRows(list, group) {
+    return list.map((m, i) => (
+      '<tr>' +
+        '<td class="col-name">' + m.name + '</td>' +
+        '<td class="col-email">' + m.email + '</td>' +
+        '<td class="col-role"><span class="role-pill">' + m.role + '</span></td>' +
+        '<td class="col-scope">' + scopeCellHtml(m.scope) + '</td>' +
+        '<td class="col-act"><button class="gear" onclick="openEditor(\'' + group + '\',' + i + ')">&#9881;</button></td>' +
+      '</tr>'
+    )).join("");
+  }
+
+  function pendingRows(list) {
+    return list.map(m => (
+      '<tr>' +
+        '<td class="col-name">' + m.name + '</td>' +
+        '<td class="col-email">' + m.email + '</td>' +
+        '<td class="col-role"><span class="role-pill">' + m.role + '</span></td>' +
+        '<td class="col-scope">' + (m.scope ? scopeCellHtml(m.scope) : '<span class="scope-muted">Set on accept</span>') + '</td>' +
+        '<td class="col-act"><div class="pending-act"><button class="btn-xs">Resend</button><button class="btn-xs danger">Revoke</button></div></td>' +
+      '</tr>'
+    )).join("");
+  }
+
+  function headRow() {
+    return '<tr><th class="col-name">Name</th><th class="col-email">Email</th><th class="col-role">Role</th>' +
+      '<th class="col-scope">Access Scope</th><th class="col-act"></th></tr>';
+  }
+
+  function renderMembers() {
+    let h = "";
+    h += '<div class="sec"><div class="sec-h">Organization Members</div><div class="sec-d">Team members and the projects their access covers.</div>' +
+      '<table class="members"><thead>' + headRow() + '</thead><tbody>' + memberRows(ORG_MEMBERS, "org") + '</tbody></table></div>';
+
+    h += '<div class="sec"><div class="sec-h">Guest Members</div><div class="sec-d">Team members scoped to a subset of projects.</div>' +
+      '<table class="members"><thead>' + headRow() + '</thead><tbody>' + memberRows(GUEST_MEMBERS, "guest") + '</tbody></table></div>';
+
+    h += '<div class="sec"><div class="sec-h">Pending invites</div><div class="sec-d"></div>' +
+      '<table class="members"><thead>' + headRow() + '</thead><tbody>' + pendingRows(PENDING) + '</tbody></table></div>';
+
+    h += '<div class="sec"><div class="sec-h">CivilGrid Support Members</div><div class="sec-d">CivilGrid support staff with access to your organization. Contact support with any questions.</div>' +
+      '<table class="members"><thead>' + headRow() + '</thead><tbody>' + memberRows(CG_SUPPORT, "cg") + '</tbody></table></div>';
+
+    document.getElementById("content").innerHTML = h;
+  }
+
+  // ===== View dispatch + nav =====
+  let currentView = "members";
+  let addingTo = -1; // index of the Access field currently accepting a new value
+  function render() { currentView === "access" ? renderAccess() : renderMembers(); }
+  function switchView(v) {
+    currentView = v;
+    addingTo = -1;
+    document.getElementById("nav-members").classList.toggle("active", v === "members");
+    document.getElementById("nav-access").classList.toggle("active", v === "access");
+    document.getElementById("invite-bar").style.display = (v === "members") ? "" : "none";
+    window.__activeScreen = v === "access" ? "Access (setup)" : PROTOTYPE_NAME;
+    render();
+  }
+
+  // ===== Access setup page =====
+  function renderAccess() {
+    let h = '<div class="access-head"><div class="sec-h">Access</div><div class="sec-d">Define the fields that control which projects a member can see. These are prescriptive — admins set the allowed values here, and members are scoped against them in the invite flow and on the <b>Members</b> tab.</div></div>';
+    h += '<div class="fields-grid">';
+    SCOPE_FIELDS.forEach((f, fi) => {
+      h += '<div class="field-card"><div class="fc-head"><span class="fc-name">' + f.name + '</span>' +
+        (f.geo ? '<span class="fc-flag geo">&#9672; Geospatial</span>' : '<span class="fc-flag list">Value list</span>') + '</div>';
+      h += '<div class="fc-desc">' + f.desc + '</div><div class="acc-chips">';
+      f.values.forEach((v, vi) => {
+        h += '<span class="acc-chip ' + (f.geo ? "geo" : "") + '">' + v + '<button class="acc-chip-x" onclick="removeValue(' + fi + ',' + vi + ')" title="Remove">&times;</button></span>';
+      });
+      if (addingTo === fi) {
+        h += '<input class="acc-input" id="acc-input" placeholder="' + (f.geo ? "Region name…" : "New value…") + '" onkeydown="if(event.key===\'Enter\'){commitValue(' + fi + ')} if(event.key===\'Escape\'){cancelAdd()}" onblur="commitValue(' + fi + ')">';
+      } else {
+        h += '<span class="acc-add" onclick="startAdd(' + fi + ')">' + (f.geo ? "+ Draw on map" : "+ Add value") + '</span>';
+      }
+      h += '</div></div>';
+    });
+    h += '</div>';
+    document.getElementById("content").innerHTML = h;
+    if (addingTo >= 0) { const inp = document.getElementById("acc-input"); if (inp) inp.focus(); }
+  }
+  function startAdd(fi) { addingTo = fi; renderAccess(); }
+  function cancelAdd() { addingTo = -1; renderAccess(); }
+  function commitValue(fi) {
+    const inp = document.getElementById("acc-input");
+    if (!inp) return;
+    const val = inp.value.trim();
+    if (val && !SCOPE_FIELDS[fi].values.includes(val)) SCOPE_FIELDS[fi].values.push(val);
+    addingTo = -1;
+    renderAccess();
+  }
+  function removeValue(fi, vi) { SCOPE_FIELDS[fi].values.splice(vi, 1); renderAccess(); }
+
+  // ===== Scope field rendering (shared by per-member + bulk) =====
+  function buildScopeFields() {
+    const wrap = document.getElementById("ed-fields");
+    wrap.innerHTML = SCOPE_FIELDS.map(f => {
+      const sel = active.scope[f.key];
+      const allOn = !sel || sel.length === 0;
+      let opts = '<span class="opt all-toggle ' + (allOn ? "on" : "") + '" data-field="' + f.key + '" data-all="1">All</span>';
+      opts += f.values.map(v =>
+        '<span class="opt ' + (f.geo ? "geo" : "") + ' ' + (sel && sel.includes(v) ? "on" : "") + '" data-field="' + f.key + '" data-val="' + v.replace(/"/g, "&quot;") + '">' + v + '</span>'
+      ).join("");
+      return '<div class="ed-field"><div class="ed-field-head"><span class="ed-field-name">' + f.name + '</span>' +
+        (f.geo ? '<span class="ed-field-mini">&#9672; drawn on map</span>' : '<span class="ed-field-mini">admin value list</span>') +
+        '</div><div class="opts">' + opts + '</div></div>';
+    }).join("");
+    wrap.querySelectorAll(".opt").forEach(o => o.onclick = onOpt);
+  }
+
+  // ===== Edit User modal (per-member) =====
+  function openEditor(group, idx) {
+    const m = GROUPS[group][idx];
+    active = { group, idx, role: m.role, scope: JSON.parse(JSON.stringify(m.scope)), bulk: false };
+    document.getElementById("mb-top").style.display = "flex";
+    document.getElementById("mh-title").textContent = "Edit User";
+    document.getElementById("ed-name").textContent = m.name;
+    document.getElementById("ed-email").textContent = m.email;
+    document.getElementById("ed-role").value = m.role;
+    document.getElementById("scope-sec-h").textContent = "Access Scope";
+    document.getElementById("scope-sec-d").innerHTML = 'Which projects this person can see. Leave a field on <b>All</b> to not restrict by it; the role above controls what they can <i>do</i>.';
+    document.getElementById("es-label").textContent = "This person can see";
+    window.__activeScreen = "Edit User — " + m.name;
+    buildScopeFields();
+    updateSentence();
+    document.getElementById("scrim").classList.add("open");
+  }
+
+  function onOpt(e) {
+    const el = e.currentTarget, field = el.dataset.field;
+    if (el.dataset.all) {
+      active.scope[field] = [];
+    } else {
+      const v = el.dataset.val, arr = active.scope[field] || [];
+      const i = arr.indexOf(v);
+      if (i >= 0) arr.splice(i, 1); else arr.push(v);
+      active.scope[field] = arr;
+    }
+    const sel = active.scope[field], allOn = !sel || sel.length === 0;
+    el.closest(".ed-field").querySelectorAll(".opt").forEach(o => {
+      if (o.dataset.all) o.classList.toggle("on", allOn);
+      else o.classList.toggle("on", !allOn && sel.includes(o.dataset.val));
+    });
+    updateSentence();
+  }
+
+  function onRoleChange() { active.role = document.getElementById("ed-role").value; }
+
+  function updateSentence() {
+    const name = document.getElementById("ed-name").textContent.split(" ")[0] || "They";
+    const restr = SCOPE_FIELDS.filter(f => active.scope[f.key] && active.scope[f.key].length > 0);
+    let s;
+    if (restr.length === 0) {
+      s = "<b>Every project</b> in the organization.";
+    } else {
+      s = "Only projects where " + restr.map(f => f.name + " is <b>" + active.scope[f.key].join(" or ") + "</b>").join(", and ") + ".";
+    }
+    document.getElementById("ed-sentence").innerHTML = s;
+  }
+
+  function saveMember() {
+    if (active) {
+      const m = GROUPS[active.group][active.idx];
+      m.scope = JSON.parse(JSON.stringify(active.scope));
+      m.role = active.role;
+    }
+    closeEditor();
+    render();
+  }
+
+  function removeMember() {
+    if (active) { GROUPS[active.group].splice(active.idx, 1); }
+    closeEditor();
+    render();
+  }
+
+  function closeEditor() {
+    document.getElementById("scrim").classList.remove("open");
+    window.__activeScreen = PROTOTYPE_NAME;
+  }
+  document.getElementById("scrim").onclick = closeEditor;
+
+  // ===== Invite flow =====
+  let invEmails = [];
+  let invScope = blankScope();
+
+  function openInvite() {
+    invEmails = [];
+    invScope = blankScope();
+    document.getElementById("inv-input").value = "";
+    document.getElementById("inv-role").value = "Project Manager";
+    renderInvEmails();
+    buildInvFields();
+    updateInvSentence();
+    document.getElementById("inv-send").disabled = true;
+    window.__activeScreen = "Invite Team Members";
+    document.getElementById("inv-scrim").classList.add("open");
+    setTimeout(() => document.getElementById("inv-input").focus(), 0);
+  }
+  function closeInvite() {
+    document.getElementById("inv-scrim").classList.remove("open");
+    window.__activeScreen = PROTOTYPE_NAME;
+  }
+  function invEmailKey(e) {
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addInvEmail(); }
+  }
+  function addInvEmail() {
+    const inp = document.getElementById("inv-input");
+    const v = inp.value.trim().replace(/,+$/, "").trim();
+    if (v && /.+@.+\..+/.test(v) && !invEmails.includes(v)) { invEmails.push(v); inp.value = ""; renderInvEmails(); }
+    document.getElementById("inv-send").disabled = invEmails.length === 0;
+  }
+  function removeInvEmail(i) {
+    invEmails.splice(i, 1); renderInvEmails();
+    document.getElementById("inv-send").disabled = invEmails.length === 0;
+  }
+  function renderInvEmails() {
+    document.getElementById("inv-emails").innerHTML = invEmails.map((em, i) =>
+      '<span class="inv-email-chip">' + em + '<button onclick="removeInvEmail(' + i + ')" title="Remove">&times;</button></span>'
+    ).join("");
+  }
+  function buildInvFields() {
+    const wrap = document.getElementById("inv-fields");
+    wrap.innerHTML = SCOPE_FIELDS.map(f => {
+      const sel = invScope[f.key];
+      const allOn = !sel || sel.length === 0;
+      let opts = '<span class="opt all-toggle ' + (allOn ? "on" : "") + '" data-field="' + f.key + '" data-all="1">All</span>';
+      opts += f.values.map(v =>
+        '<span class="opt ' + (f.geo ? "geo" : "") + ' ' + (sel && sel.includes(v) ? "on" : "") + '" data-field="' + f.key + '" data-val="' + v.replace(/"/g, "&quot;") + '">' + v + '</span>'
+      ).join("");
+      return '<div class="ed-field"><div class="ed-field-head"><span class="ed-field-name">' + f.name + '</span>' +
+        (f.geo ? '<span class="ed-field-mini">&#9672; drawn on map</span>' : '<span class="ed-field-mini">admin value list</span>') +
+        '</div><div class="opts">' + opts + '</div></div>';
+    }).join("");
+    wrap.querySelectorAll(".opt").forEach(o => o.onclick = onInvOpt);
+  }
+  function onInvOpt(e) {
+    const el = e.currentTarget, field = el.dataset.field;
+    if (el.dataset.all) { invScope[field] = []; }
+    else {
+      const v = el.dataset.val, arr = invScope[field] || [];
+      const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v);
+      invScope[field] = arr;
+    }
+    const sel = invScope[field], allOn = !sel || sel.length === 0;
+    el.closest(".ed-field").querySelectorAll(".opt").forEach(o => {
+      if (o.dataset.all) o.classList.toggle("on", allOn);
+      else o.classList.toggle("on", !allOn && sel.includes(o.dataset.val));
+    });
+    updateInvSentence();
+  }
+  function updateInvSentence() {
+    const restr = SCOPE_FIELDS.filter(f => invScope[f.key] && invScope[f.key].length > 0);
+    let s = restr.length === 0
+      ? "<b>Every project</b> in the organization."
+      : "Only projects where " + restr.map(f => f.name + " is <b>" + invScope[f.key].join(" or ") + "</b>").join(", and ") + ".";
+    document.getElementById("inv-sentence").innerHTML = s;
+  }
+  function sendInvites() {
+    addInvEmail(); // capture any email still typed in the box
+    if (invEmails.length === 0) return;
+    const role = document.getElementById("inv-role").value;
+    invEmails.forEach(em => PENDING.push({ name: em, email: em, role: role, scope: JSON.parse(JSON.stringify(invScope)) }));
+    closeInvite();
+    render();
+  }
+
+  // ===== Info panel =====
+  function toggleInfo() {
+    const ip = document.getElementById('info-panel');
+    const willOpen = !ip.classList.contains('open');
+    ip.classList.toggle('open');
+    if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+  }
+
+  // ===== Feedback widget =====
+  const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+  const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+  const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+  const PROTOTYPE_SLUG = FILE_NAME.replace(/\.html?$/i, "").replace(/-b\d{3,}$/i, "");
+  const PROTOTYPE_NAME = PROTOTYPE_SLUG.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  window.__activeScreen = window.__activeScreen || PROTOTYPE_NAME;
+
+  function fbUrl(embedded) {
+    const u = new URL(FEEDBACK_FORM_BASE);
+    if (embedded) u.searchParams.set("embedded", "true");
+    u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+    u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+    u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+    return u.toString();
+  }
+  function fbOpen() {
+    document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+    document.getElementById('fb-frame').src = fbUrl(true);
+    document.getElementById('fb-newtab').href = fbUrl(false);
+    document.getElementById('info-panel').classList.remove('open');
+    document.getElementById('fb-pane').classList.add('open');
+  }
+  function fbClose() { document.getElementById('fb-pane').classList.remove('open'); }
+  document.getElementById('fb-open').onclick = fbOpen;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { fbClose(); closeEditor(); closeInvite(); } });
+
+  // ===== init =====
+  switchView("members");
+</script>
+</body>
+</html>
