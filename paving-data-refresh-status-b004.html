@@ -1,10 +1,10 @@
 <!--
   BUILD b004 · Jun 22, 2026
   Build history (newest first):
-    b004 · Jun 22, 2026 — per Sam/Adam: dynamic refresh cadence (not fixed quarters); added "Done — No Updates" status; softened entry button; noted manual/Linear status maintenance
+    b004 · Jun 22, 2026 — per eng leads: dynamic refresh cadence (not fixed quarters); added "Done — No Updates" status; softened entry button; noted manual/Linear status maintenance
     b003 · Jun 22, 2026 — renamed "Outreach Status" → "Research Status"; new states (Not Started / In Progress / Done — New Data / Done — No Data Provided / Done — Changes Received)
     b002 · Jun 22, 2026 — compact email toggle top-right; 3 cards on one line; progress bar below cards; standard table controls
-    b001 · Jun 22, 2026 — initial build (Conflicts Summary + linked Paving Data Refresh Status page, from the 6/22 Adam/Sam meeting)
+    b001 · Jun 22, 2026 — initial build (Conflicts Summary + linked Paving Data Refresh Status page, from the 6/22 planning meeting)
   To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
   info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
 -->
@@ -208,12 +208,12 @@
 </div>
 <div class="info-panel" id="info-panel">
   <div class="info-panel-title">Paving Data Refresh Status</div>
-  <div class="info-panel-section"><strong>Purpose</strong><p>From the 6/22 Adam/Sam meeting: give program managers a status page showing how far along CivilGrid is on the quarterly paving/moratoria data refresh across the service territory — reachable from where conflicts already live.</p></div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>From the 6/22 planning meeting: give program managers a status page showing how far along CivilGrid is on the quarterly paving/moratoria data refresh across the service territory — reachable from where conflicts already live.</p></div>
   <div class="info-panel-section"><strong>What to notice</strong><ul>
     <li>The <b>Data Refresh Status</b> link sits on the Conflicts Summary page (click it to cross over)</li>
     <li>Top progress tracker is cadence-agnostic ("Cycle 2 of 6") — refresh frequency is per-org, not fixed quarters</li>
     <li>Per-jurisdiction research status chips, incl. "Done — No Updates" (current, nothing new this cycle)</li>
-    <li>Notes cells are <b>admin-editable</b> (click one and type) — Adam's ask</li>
+    <li>Notes cells are <b>admin-editable</b> (click one and type) — stakeholder ask</li>
     <li>Opt-in toggle for the monthly summary email that replaces the spreadsheet to the program manager</li>
   </ul></div>
   <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b004</b> — dynamic cadence; "Done — No Updates" status; softened button; manual/Linear status note</li><li><b>b003</b> — "Research Status" rename + new states</li><li><b>b002</b> — layout + standard controls</li><li><b>b001</b> — initial build</li></ul></details>
@@ -222,7 +222,7 @@
     <div class="grp"><b>Foundation / data model</b><ul>
       <li>Derive per-jurisdiction last-refresh date from existing load timestamps</li>
       <li>Model research status per jurisdiction (Not Started / In Progress / Done — New Data / Done — Changes Received / Done — No Updates / Done — No Data Provided)</li>
-      <li>Per-org refresh cadence config (e.g. PG&amp;E ~6×/yr, Atmos 1×/yr) drives the cycle label + % complete — not fixed calendar quarters</li>
+      <li>Per-org refresh cadence config (e.g. a large electric utility ~6×/yr, a smaller gas utility 1×/yr) drives the cycle label + % complete — not fixed calendar quarters</li>
       <li>Per-jurisdiction admin-editable notes field (static facts + research notes)</li>
       <li>Compute projects-impacted per jurisdiction via spatial join to project boundaries</li>
     </ul></div>
@@ -237,8 +237,8 @@
     </ul></div>
     <div class="grp"><b>Decisions &amp; spikes</b><ul>
       <li>Chunky status first vs. granular research detail <span class="note">(meeting: start chunky)</span></li>
-      <li>Admin edit surface for notes — inline vs. separate admin view <span class="note">(Adam)</span></li>
-      <li>Research status likely maintained manually — explore integrating Adam's Linear project (PG&amp;E Q2 2026) as the source <span class="note">(Adam)</span></li>
+      <li>Admin edit surface for notes — inline vs. separate admin view <span class="note">(engineering)</span></li>
+      <li>Research status likely maintained manually — explore integrating the existing internal Linear project as the source <span class="note">(engineering)</span></li>
       <li>Is this org-level (territory) or also project-scoped? <span class="note">(open)</span></li>
     </ul></div>
   </details>
