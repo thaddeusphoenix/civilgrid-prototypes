@@ -6,6 +6,9 @@
   Supersedes the two standalone files (contract-prebuy-usage-b001 = Layout A,
   contract-prebuy-usage-variant-b-b001 = Layout B). Identical data across both layouts.
   Build history (newest first):
+    b002 · Jul 8, 2026 — removed utilization %, monthly run/burn rate, and ALL expected-usage/pacing
+                          (pace markers, projected-unused, on-plan pace, burn-up projection, term-elapsed %);
+                          pared to purchased-vs-used-to-date per feedback
     b001 · Jul 7, 2026 — initial build (merged A + B with header toggle)
   To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
   info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
@@ -137,7 +140,7 @@
   .panel-title svg { width: 18px; height: 18px; color: var(--grey-50); }
 
   /* ===== LAYOUT A: tiles + progress + vertical bars ===== */
-  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; max-width: 560px; }
   .stat-card { background: var(--white); border: 1px solid var(--grey-30); border-radius: 8px; padding: 16px; }
   .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey-50); font-weight: 600; }
   .stat-value { font-family: var(--mono); font-size: 30px; font-weight: 600; color: var(--grey-90); margin-top: 8px; line-height: 1; }
@@ -153,9 +156,7 @@
   .usage-track-wrap { position: relative; padding-top: 4px; }
   .usage-track { height: 14px; border-radius: 9999px; background: var(--grey-20); overflow: hidden; }
   .usage-fill { height: 100%; border-radius: 9999px; background: linear-gradient(90deg, var(--blue-60), var(--blue-40)); width: 32.8%; }
-  .pace-marker { position: absolute; top: 0; bottom: -18px; left: 52%; width: 2px; background: var(--grey-50); }
-  .pace-marker::after { content: "Expected pace · 52%"; position: absolute; top: -20px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10px; color: var(--grey-60); font-weight: 500; }
-  .usage-legend-row { margin-top: 26px; display: flex; gap: 20px; font-size: 12px; color: var(--grey-60); }
+  .usage-legend-row { margin-top: 12px; display: flex; gap: 20px; font-size: 12px; color: var(--grey-60); }
   .usage-legend-row .k { font-family: var(--mono); color: var(--grey-80); }
 
   .callout { display: flex; gap: 10px; align-items: flex-start; background: var(--blue-10); border: 1px solid var(--blue-20); border-radius: 8px; padding: 12px 14px; margin-top: 16px; }
@@ -209,7 +210,7 @@
   .pbt-track { height: 8px; border-radius: 9999px; background: var(--grey-20); overflow: hidden; }
   .pbt-fill { height: 100%; border-radius: 9999px; }
 
-  /* ===== LAYOUT B: gauge + burn-up + horizontal months ===== */
+  /* ===== LAYOUT B: gauge + trajectory + horizontal months ===== */
   .hero { display: grid; grid-template-columns: 240px 1fr; gap: 8px; align-items: center; padding: 24px; }
   .gauge-wrap { position: relative; width: 200px; height: 200px; margin: 0 auto; }
   .gauge-wrap svg { width: 200px; height: 200px; transform: rotate(-90deg); }
@@ -241,9 +242,6 @@
   .bu-tip .t-row { display: flex; justify-content: space-between; gap: 16px; }
   .bu-tip .t-row .tv { font-family: var(--mono); }
   .bu-tip .t-delta { margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(255,255,255,0.25); }
-
-  .pace-line { font-size: 13px; color: var(--grey-70); line-height: 1.6; margin: 14px 4px 0; padding-left: 12px; border-left: 3px solid var(--blue-40); }
-  .pace-line b { color: var(--grey-90); }
 
   .months-card { padding: 16px 20px; margin-top: 8px; }
   .mrow { display: flex; align-items: center; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--grey-10); }
@@ -309,34 +307,34 @@
 </div>
 <div class="info-panel" id="info-panel">
   <div class="info-panel-title">Contract Pre-Buy &amp; Usage (A/B)</div>
-  <div class="info-panel-section"><strong>Purpose</strong><p>One customer-facing page, two formatting takes, toggled from the Prototype bar. Same data both ways — which layout communicates pre-buy status and pacing fastest?</p></div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>One customer-facing page, two formatting takes, toggled from the Prototype bar. Same data both ways — which layout shows <b>what was bought and how much is used to date</b> fastest? No pacing, no projections, no expected-usage framing.</p></div>
   <div class="info-panel-section"><strong>Layout A — tiles + bars</strong><ul>
-    <li>4 stat tiles, a usage progress bar with an "expected pace" marker</li>
+    <li>2 stat tiles (used, remaining) + a usage progress bar (drawn vs. remaining)</li>
     <li>Vertical stacked monthly bar chart — hover to reveal per-tier</li>
     <li>Scannable, familiar dashboard pattern</li>
   </ul></div>
-  <div class="info-panel-section"><strong>Layout B — gauge + burn-up</strong><ul>
-    <li>Radial consumption gauge + summary list</li>
-    <li>Burn-up chart: actual vs. on-plan pace, projected to term end under the pool ceiling — hover the points</li>
+  <div class="info-panel-section"><strong>Layout B — gauge + trajectory</strong><ul>
+    <li>Radial gauge (units used vs. pre-purchased) + summary facts</li>
+    <li>Cumulative units-drawn-to-date line under the pool ceiling — hover the points</li>
     <li>Monthly detail as horizontal rows with per-tier values shown inline</li>
-    <li>Narrative, one-glance pacing story</li>
+    <li>Calm, one-glance status of the contract</li>
   </ul></div>
-  <div class="info-panel-section"><strong>What to notice</strong><p>Toggle A/B in the header. Both layouts stamp the feedback form with which one you were viewing.</p></div>
-  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b001</b> — initial build (merged A + B with header toggle)</li></ul></details>
+  <div class="info-panel-section"><strong>What to notice</strong><p>Toggle A/B in the header. Both show only what was bought and consumption to date — no utilization %, run rate, or projected usage. Both stamp the feedback form with which layout you were viewing.</p></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b002</b> — removed utilization %, monthly run/burn rate, and all expected-usage/pacing (pace markers, projected-unused, on-plan pace, burn-up projection, term-elapsed %); pared to purchased-vs-used-to-date</li><li><b>b001</b> — initial build (merged A + B with header toggle)</li></ul></details>
   <details class="info-panel-details">
     <summary>If we build this — Linear issues</summary>
     <div class="grp"><b>Foundation / data model</b><ul>
       <li>Add pre-buy pool + term to org billing model (pool size, unit definition, start/end)</li>
       <li>Compute units consumed per project from geometry + tier</li>
-      <li>Monthly usage rollup by tier + cumulative series/projection for the burn-up view</li>
+      <li>Monthly usage rollup by tier + cumulative units-to-date series for the trajectory view</li>
     </ul></div>
     <div class="grp"><b>Customer UI (Org Settings)</b><ul>
       <li>Add "Usage" tab to Org Settings nav (gate behind ViewSubscriptionInfo)</li>
-      <li>Build the chosen layout (A tiles+bars or B gauge+burn-up) — this A/B decides</li>
+      <li>Build the chosen layout (A tiles+bars or B gauge+trajectory) — this A/B decides</li>
       <li>Build contract details + projects-by-tier</li>
     </ul></div>
     <div class="grp"><b>Enforcement / in-app</b><ul>
-      <li>Surface remaining pool + pacing on project create</li>
+      <li>Surface remaining pool on project create</li>
       <li>Notify billing contact at pool thresholds via Knock</li>
     </ul></div>
     <div class="grp"><b>Decisions &amp; spikes</b><ul>
@@ -417,19 +415,9 @@
             <div class="stat-sub">of pre-purchased pool</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Utilization</div>
-            <div class="stat-value">33%</div>
-            <div class="stat-sub"><span class="warn">Behind</span> · expected 52% by now</div>
-          </div>
-          <div class="stat-card">
             <div class="stat-label">Remaining</div>
             <div class="stat-value">1,075</div>
             <div class="stat-sub">units · through Dec 28, 2026</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Monthly Burn Rate</div>
-            <div class="stat-value">88</div>
-            <div class="stat-sub">units / mo · trailing 6-mo avg</div>
           </div>
         </div>
 
@@ -444,19 +432,10 @@
           </div>
           <div class="usage-track-wrap">
             <div class="usage-track"><div class="usage-fill"></div></div>
-            <div class="pace-marker"></div>
           </div>
           <div class="usage-legend-row">
             <span><span class="k">525</span> drawn</span>
             <span><span class="k">1,075</span> remaining</span>
-            <span><span class="k">~575</span> projected unused at term end</span>
-          </div>
-        </div>
-
-        <div class="callout">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
-          <div class="co-body">
-            You're pacing <b>below plan</b> — 33% consumed against 52% of the term elapsed. At your current ~88 units/mo, you're on track to close the term with roughly <b>575 units of headroom</b> (~36% of the pool). Plenty of room to bring more projects onto CivilGrid before Dec 28.
           </div>
         </div>
 
@@ -488,7 +467,6 @@
             <div class="kv-row"><span class="k">Contract start</span><span class="v text">Dec 29, 2025</span></div>
             <div class="kv-row"><span class="k">Contract end</span><span class="v text">Dec 28, 2026</span></div>
             <div class="kv-row"><span class="k">Pre-purchased pool</span><span class="v">1,600 units</span></div>
-            <div class="kv-row"><span class="k">Term elapsed</span><span style="display:flex;align-items:center;gap:10px"><span class="term-bar"><div></div></span><span class="v">52%</span></span></div>
             <div class="kv-row"><span class="k">Contract value</span><span class="v">$4,000,000</span></div>
             <div class="kv-row"><span class="k">Value consumed</span><span class="v">≈ $1,312,500</span></div>
           </div>
@@ -543,17 +521,17 @@
                 <circle id="gauge-val" cx="100" cy="100" r="78" fill="none" stroke="url(#gaugeGrad)" stroke-width="16" stroke-linecap="round" stroke-dasharray="490.1" stroke-dashoffset="490.1"/>
               </svg>
               <div class="gauge-center">
-                <div class="gauge-pct">33%</div>
-                <div class="gauge-cap">consumed</div>
-                <div class="gauge-units">525 / 1,600 units</div>
+                <div class="gauge-pct" style="font-size:34px">525</div>
+                <div class="gauge-cap">units used</div>
+                <div class="gauge-units">of 1,600 pre-purchased</div>
               </div>
             </div>
           </div>
           <div class="hero-summary">
+            <div class="sum-row"><span class="sum-k">Units used</span><span class="sum-v">525 <small>units</small></span></div>
             <div class="sum-row"><span class="sum-k">Remaining</span><span class="sum-v">1,075 <small>units</small></span></div>
-            <div class="sum-row"><span class="sum-k">Monthly burn rate</span><span class="sum-v">88 <small>units / mo</small></span></div>
-            <div class="sum-row"><span class="sum-k">Term elapsed</span><span class="sum-v warn">52% <small>expected pace</small></span></div>
-            <div class="sum-row"><span class="sum-k">Projected unused at term end</span><span class="sum-v">~575 <small>units</small></span></div>
+            <div class="sum-row"><span class="sum-k">Pre-purchased pool</span><span class="sum-v">1,600 <small>units</small></span></div>
+            <div class="sum-row"><span class="sum-k">Value consumed</span><span class="sum-v">≈ $1.31M</span></div>
           </div>
         </div>
         <p class="unit-note">
@@ -562,22 +540,17 @@
       </div>
 
       <div class="section">
-        <div class="section-title">Consumption vs. Plan</div>
+        <div class="section-title">Usage to Date</div>
         <div class="card burnup-card">
           <div class="burnup-head">
             <span class="burnup-title">Cumulative units drawn over the contract term</span>
           </div>
           <svg class="burnup-svg" id="burnup" viewBox="0 0 760 340" preserveAspectRatio="xMidYMid meet"></svg>
           <div class="bu-legend">
-            <span class="bu-leg"><span class="bu-swatch" style="border-top-color:var(--blue-50)"></span>Actual usage</span>
-            <span class="bu-leg"><span class="bu-swatch dash" style="border-top-color:var(--blue-40)"></span>Projected (at current burn)</span>
-            <span class="bu-leg"><span class="bu-swatch dash" style="border-top-color:var(--grey-40)"></span>On-plan pace</span>
+            <span class="bu-leg"><span class="bu-swatch" style="border-top-color:var(--blue-50)"></span>Units drawn to date</span>
             <span class="bu-leg"><span class="bu-swatch" style="border-top-color:var(--grey-80)"></span>Contracted pool</span>
           </div>
         </div>
-        <p class="pace-line">
-          At today's mark you've drawn <b>525 units</b> — the on-plan pace would be ~832. You're <b>307 units behind plan</b>, which at your current burn projects to closing the term with <b>~575 units of headroom</b>. Room to bring more projects onto CivilGrid before Dec 28.
-        </p>
 
         <button class="collapse-toggle" id="months-toggle" onclick="toggleMonths()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
@@ -639,8 +612,8 @@
 
 <script>
   /* ===== Build stamp ===== */
-  const BUILD = 1;
-  const BUILD_DATE = "Jul 7, 2026";
+  const BUILD = 2;
+  const BUILD_DATE = "Jul 8, 2026";
   const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
   document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
 
@@ -657,7 +630,7 @@
     document.getElementById('variant-a').style.display = (v === 'a') ? 'block' : 'none';
     document.getElementById('variant-b').style.display = (v === 'b') ? 'block' : 'none';
     document.querySelectorAll('.ab-btn').forEach(b => b.classList.toggle('active', b.dataset.variant === v));
-    window.__activeScreen = (v === 'a') ? 'Layout A — tiles + bars' : 'Layout B — gauge + burn-up';
+    window.__activeScreen = (v === 'a') ? 'Layout A — tiles + bars' : 'Layout B — gauge + trajectory';
   }
 
   /* ===== Feedback (shared Prototype Feedback Google Form) ===== */
@@ -742,15 +715,11 @@
   /* ===== LAYOUT B: gauge ===== */
   (function () { const C = 2 * Math.PI * 78; const frac = 525 / 1600; document.getElementById("gauge-val").setAttribute("stroke-dashoffset", (C * (1 - frac)).toFixed(1)); })();
 
-  /* ===== LAYOUT B: burn-up chart ===== */
+  /* ===== LAYOUT B: cumulative usage-to-date chart ===== */
   const ACTUAL = [
     [0.000, 0,   "Dec 29, 2025 (start)"], [0.090, 61, "Jan 2026"], [0.167, 149, "Feb 2026"],
     [0.252, 244, "Mar 2026"], [0.334, 316, "Apr 2026"], [0.419, 432, "May 2026"],
-    [0.501, 525, "Jun 2026"], [0.521, 525, "Today · Jul 7, 2026"],
-  ];
-  const PROJ = [
-    [0.521, 525, "Today · Jul 7, 2026"], [0.586, 613, "Jul 2026 (proj.)"], [0.671, 701, "Aug 2026 (proj.)"],
-    [0.756, 789, "Sep 2026 (proj.)"], [0.838, 877, "Oct 2026 (proj.)"], [0.923, 965, "Nov 2026 (proj.)"], [1.000, 1025, "Dec 28, 2026 (proj.)"],
+    [0.501, 525, "Jun 2026"], [0.521, 525, "Today · Jul 8, 2026"],
   ];
   const TODAY_X = 0.521;
   const SVGNS = "http://www.w3.org/2000/svg";
@@ -770,36 +739,26 @@
     [[0, "Dec"], [0.25, "Mar"], [0.5, "Jun"], [0.75, "Sep"], [1, "Dec"]].forEach(([f, l]) => {
       const t = el("text", { x: xPx(f), y: VH - 12, "text-anchor": "middle", class: "bu-axis" }); t.textContent = l; svg.appendChild(t);
     });
-    svg.appendChild(el("rect", { x: xPx(1) - 3, y: yPx(POOL), width: 3, height: yPx(1025) - yPx(POOL), fill: "#eaf5ff" }));
     svg.appendChild(el("line", { x1: MG.l, y1: yPx(POOL), x2: VW - MG.r, y2: yPx(POOL), stroke: "#243442", "stroke-width": 2 }));
     const ct = el("text", { x: VW - MG.r + 6, y: yPx(POOL) + 4, class: "bu-note", fill: "#393b3d" }); ct.textContent = "Pool 1,600"; svg.appendChild(ct);
-    svg.appendChild(el("line", { x1: xPx(0), y1: yPx(0), x2: xPx(1), y2: yPx(POOL), stroke: "#babdc0", "stroke-width": 1.5, "stroke-dasharray": "5 4" }));
-    svg.appendChild(el("polyline", { points: pts(PROJ), fill: "none", stroke: "#27b4f6", "stroke-width": 2, "stroke-dasharray": "5 4" }));
     svg.appendChild(el("polyline", { points: pts(ACTUAL), fill: "none", stroke: "#196fe0", "stroke-width": 2.5 }));
-    const ht = el("text", { x: VW - MG.r + 6, y: (yPx(1025) + yPx(POOL)) / 2 + 4, class: "bu-note", fill: "#134a91" }); ht.textContent = "~575"; svg.appendChild(ht);
-    const ht2 = el("text", { x: VW - MG.r + 6, y: (yPx(1025) + yPx(POOL)) / 2 + 18, class: "bu-note", fill: "#134a91" }); ht2.textContent = "headroom"; svg.appendChild(ht2);
     svg.appendChild(el("line", { x1: xPx(TODAY_X), y1: MG.t, x2: xPx(TODAY_X), y2: VH - MG.b, stroke: "#888c90", "stroke-width": 1, "stroke-dasharray": "2 3" }));
     const tt = el("text", { x: xPx(TODAY_X), y: MG.t - 4, "text-anchor": "middle", class: "bu-note", fill: "#54585b" }); tt.textContent = "Today"; svg.appendChild(tt);
-    function addPoint(p, projected) {
+    function addPoint(p) {
       const cx = xPx(p[0]), cy = yPx(p[1]);
-      svg.appendChild(el("circle", { cx, cy, r: 3.5, fill: projected ? "#fff" : "#196fe0", stroke: projected ? "#27b4f6" : "#196fe0", "stroke-width": 2 }));
+      svg.appendChild(el("circle", { cx, cy, r: 3.5, fill: "#196fe0", stroke: "#196fe0", "stroke-width": 2 }));
       const hit = el("circle", { cx, cy, r: 12, fill: "transparent", style: "cursor:pointer" });
-      hit.addEventListener("mousemove", e => showBuTip(e, p, projected));
+      hit.addEventListener("mousemove", e => showBuTip(e, p));
       hit.addEventListener("mouseleave", hideBuTip);
       svg.appendChild(hit);
     }
-    ACTUAL.forEach(p => addPoint(p, false));
-    PROJ.slice(1).forEach(p => addPoint(p, true));
+    ACTUAL.forEach(p => addPoint(p));
     svg.appendChild(el("circle", { cx: xPx(TODAY_X), cy: yPx(525), r: 4.5, fill: "#243442" }));
   })();
-  function showBuTip(e, p, projected) {
+  function showBuTip(e, p) {
     const tip = document.getElementById("bu-tip");
-    const onplan = Math.round(POOL * p[0]), delta = p[1] - onplan;
-    const deltaTxt = delta === 0 ? "on plan" : (delta < 0 ? Math.abs(delta) + " behind plan" : delta + " ahead of plan");
     tip.innerHTML = '<div class="t-m">' + p[2] + '</div>' +
-      '<div class="t-row"><span>' + (projected ? "Projected" : "Cumulative") + '</span><span class="tv">' + p[1].toLocaleString() + ' units</span></div>' +
-      '<div class="t-row"><span>On-plan pace</span><span class="tv">' + onplan.toLocaleString() + '</span></div>' +
-      '<div class="t-row t-delta"><span>Delta</span><span class="tv">' + deltaTxt + '</span></div>';
+      '<div class="t-row"><span>Units drawn</span><span class="tv">' + p[1].toLocaleString() + ' units</span></div>';
     tip.classList.add("show");
     let x = e.clientX + 14, y = e.clientY - 10; if (x + 200 > window.innerWidth) x = e.clientX - 200;
     tip.style.left = x + "px"; tip.style.top = y + "px";
