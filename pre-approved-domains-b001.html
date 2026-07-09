@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<!--
+  BUILD b001 · Jul 9, 2026
+  Clone of the real /admin/pre-approved-orgs screen (packages/client/src/pages/admin/preApprovedOrgs/index.tsx).
+  Build history (newest first):
+    b001 · Jul 9, 2026 — initial build
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pre-Approved Domains — CivilGrid Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#ffffff;
+    --grey-10:#f4f5f5; --grey-20:#e9eaeb; --grey-30:#d2d4d7; --grey-40:#babdc0;
+    --grey-50:#888c90; --grey-60:#6e7376; --grey-70:#54585b; --grey-80:#393b3d; --grey-90:#1d1e20;
+    --blue-10:#eaf5ff; --blue-20:#c0dbfe; --blue-40:#27b4f6; --blue-50:#196fe0; --blue-60:#134a91; --blue-80:#243442; --blue-90:#1f2c38;
+    --red-50:#ef4444; --red-70:#b91c1c;
+    --amber-50:#fffbeb; --amber-200:#fde68a; --amber-800:#92400e;
+    --secondary:#656e75;
+    --brand:#f27e31;
+    --sans:"Noto Sans", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: var(--sans); background: var(--white); color: var(--grey-90); padding-top: 32px; -webkit-font-smoothing: antialiased; }
+
+  /* ============ PROTOTYPE BAR ============ */
+  .proto-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 32px; background: #243442; display: flex; align-items: center; justify-content: center; padding: 0 16px; gap: 10px; user-select: none; }
+  .proto-badge { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: none; padding: 0; color: #f27e31; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .proto-build { flex-shrink: 0; color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  .proto-desc { font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; padding: 2px 6px; }
+  .proto-actions { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+  .proto-about-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; animation: fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse { 0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); } 50% { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); } }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+
+  .info-panel { display: none; position: fixed; top: 32px; right: 0; width: 340px; background: #ffffff; border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px; padding: 16px; z-index: 199; box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px; color: #393b3d; line-height: 1.5; max-height: calc(100vh - 40px); overflow-y: auto; }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  .fb-pane { display: none; position: fixed; top: 32px; right: 0; bottom: 0; width: 440px; max-width: 92vw; background: #fff; border-left: 1px solid #d2d4d7; box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199; flex-direction: column; overflow: hidden; }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+
+  /* ============ TOP NAV ============ */
+  .top-nav { position: sticky; top: 32px; z-index: 100; height: 48px; width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--white); border-bottom: 1px solid var(--grey-30); padding: 0 12px; }
+  .tn-left { display: flex; align-items: center; gap: 10px; }
+  .tn-logo { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: var(--brand); text-transform: uppercase; line-height: 1; }
+  .tn-switcher { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 400; color: var(--grey-80); cursor: pointer; }
+  .tn-switcher svg { width: 9px; height: 6px; }
+  .tn-right { display: flex; align-items: center; gap: 4px; }
+  .tn-icon-btn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--grey-60); cursor: pointer; border-radius: 4px; }
+  .tn-icon-btn:hover { background: var(--grey-10); }
+  .tn-icon-btn svg { width: 17px; height: 17px; }
+  .tn-avatar { width: 28px; height: 28px; border-radius: 9999px; background: var(--blue-80); color: #fff; font-size: 11px; font-weight: 600; text-transform: uppercase; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
+
+  /* ============ LAYOUT ============ */
+  .app-body { display: flex; flex-direction: row; height: calc(100vh - 32px - 48px); }
+  .left-nav { width: 224px; flex: none; border-right: 1px solid var(--grey-30); background: var(--white); display: flex; flex-direction: column; }
+  .ln-home { display: flex; align-items: center; gap: 4px; margin: 8px 8px 0; padding: 4px 8px; color: var(--blue-50); font-size: 14px; text-decoration: none; width: fit-content; }
+  .ln-home svg { width: 14px; height: 14px; }
+  .ln-home span.txt { border-bottom: 1px solid transparent; }
+  .ln-home:hover span.txt { border-bottom-color: var(--blue-50); }
+  .ln-scroll { overflow-y: auto; padding: 8px; padding-bottom: 96px; }
+  .ln-divider { margin: 8px 0; height: 1px; background: var(--grey-20); }
+  .ln-section { display: flex; flex-direction: column; gap: 4px; }
+  .ln-section-title { margin: 4px 0; padding: 0 4px; font-weight: 500; font-size: 14px; color: var(--secondary); }
+  .ln-item { display: block; padding: 4px 8px; border-radius: 2px; font-size: 14px; color: var(--grey-90); text-decoration: none; transition: all 0.05s; cursor: pointer; }
+  .ln-item:hover { background: var(--grey-20); }
+  .ln-item.active { background: var(--blue-10); color: var(--blue-60); font-weight: 500; }
+
+  .content { flex: 1; overflow-y: auto; padding: 0 12px; }
+  .content-inner { max-width: 900px; padding: 16px 0; display: flex; flex-direction: column; gap: 24px; }
+
+  .page-title { font-size: 16px; font-weight: 500; color: var(--grey-90); margin: 0; }
+  .major-heading { font-size: 14px; font-weight: 700; color: var(--grey-90); }
+  .desc-text { font-size: 14px; color: #6b7280; margin: -12px 0 0; }
+
+  .add-row { display: flex; align-items: flex-start; gap: 8px; }
+  .add-field { display: flex; flex-direction: column; gap: 4px; }
+  .add-input { border-radius: 4px; border: 1px solid #d1d5db; padding: 6px 12px; font-size: 14px; font-family: var(--sans); outline: none; color: var(--grey-90); width: 220px; }
+  .add-input:focus { border-color: #3b82f6; }
+  .add-error { font-size: 12px; color: var(--red-50); }
+  .btn { font-family: var(--sans); font-size: 12px; font-weight: 500; line-height: 20px; border-radius: 6px; padding: 4px 8px; border: 1px solid transparent; cursor: pointer; }
+  .btn-primary { background: var(--blue-80); color: #fff; }
+  .btn-primary:hover { background: var(--blue-90); }
+  .btn-disabled { background: var(--grey-20); color: var(--grey-50); cursor: not-allowed; }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #d1d5db; border-radius: 4px; padding: 64px 0; text-align: center; }
+  .empty-title { font-size: 14px; font-weight: 500; color: #4b5563; }
+  .empty-sub { font-size: 12px; color: #9ca3af; }
+
+  table.domains-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .domains-table thead tr { border-bottom: 1px solid #e5e7eb; background: #f9fafb; text-align: left; }
+  .domains-table th { padding: 8px 12px; font-weight: 500; color: #4b5563; }
+  .domains-table td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; }
+  .domains-table tr.active-row:hover { background: #f9fafb; }
+  .domains-table tr.removed-row { background: #f9fafb; opacity: 0.6; }
+  .cell-domain { font-family: ui-monospace, "Noto Sans Mono", monospace; color: #1f2937; }
+  .removed-row .cell-domain { color: #9ca3af; text-decoration: line-through; }
+  .cell-muted { color: #6b7280; }
+  .cell-dash { color: #9ca3af; }
+  .cell-remove-wrap { text-align: right; }
+  .remove-link { font-size: 12px; color: var(--red-50); background: none; border: none; cursor: pointer; padding: 0; }
+  .remove-link:hover { color: var(--red-70); }
+
+  /* ── Confirmation dialog ── */
+  .dlg-overlay { display: none; position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+  .dlg-overlay.open { display: flex; }
+  .dlg-content { width: 30rem; max-width: 88vw; background: #fff; border: 1px solid var(--grey-30); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }
+  .dlg-head { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 16px; }
+  .dlg-title { font-size: 18px; font-weight: 600; color: var(--blue-80); padding-right: 32px; }
+  .dlg-close { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border-radius: 4px; border: none; background: transparent; color: var(--grey-70); font-size: 16px; cursor: pointer; opacity: 0.7; }
+  .dlg-close:hover { opacity: 1; background: var(--grey-20); }
+  .dlg-body { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 16px; }
+  .dlg-warn { border-radius: 4px; border: 1px solid var(--amber-200); background: var(--amber-50); padding: 12px 16px; font-size: 14px; color: var(--amber-800); }
+  .dlg-checkbox-row { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; color: #374151; cursor: pointer; }
+  .dlg-checkbox-row input { margin-top: 2px; width: 15px; height: 15px; accent-color: var(--blue-60); flex-shrink: 0; }
+  .dlg-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 16px 16px; }
+</style>
+</head>
+<body>
+
+<!-- ============ PROTOTYPE BAR ============ -->
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc" onclick="toggleInfo()">Pre-Approved Domains — CivilGrid Admin</span>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Pre-Approved Domains — CivilGrid Admin</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>Clone of the live superadmin screen (<code>/admin/pre-approved-orgs</code>) — lets a CS admin whitelist an email domain so future invited users on that domain skip the manual Persona-approval queue.</p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li>Adding a domain requires an explicit confirmation step — the admin attests they've received and filed written proof of the domain's background-check process before the whitelist takes effect</li>
+    <li>Removing a domain doesn't delete the row — it's struck through with a "Removed" date, so the audit trail stays intact</li>
+    <li>This whitelist is a separate mechanism from org auto-join — combining the two would let a user sign up and land in an org with zero manual review, which is why org owners get notified on auto-join (mitigation, not built into this screen)</li>
+  </ul></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b001</b> — initial build</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Already shipped</b><ul>
+      <li>Domain whitelist store + admin CRUD (this screen, live)</li>
+      <li>Domain format validation + duplicate-active-domain guard</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app (not yet built)</b><ul>
+      <li>Programmatically skip the Persona verification screen for whitelisted-domain users</li>
+      <li>Notify org owners when a new user auto-joins via a whitelisted domain</li>
+      <li>Backend audit log tying each auto-approval back to the whitelist entry and admin who added it</li>
+    </ul></div>
+    <div class="grp"><b>Admin UI</b><ul>
+      <li>Search/filter for the domain list at scale</li>
+      <li>Optional time-bound expiration on a whitelist entry</li>
+      <li>Cross-reference link from this page to the org auto-join settings page</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Legal review of the "written proof" confirmation copy before wider rollout <span class="note">(legal/compliance)</span></li>
+      <li>Confirmation copy direction — "I've uploaded [document]" vs. current "written proof" framing <span class="note">(design feedback)</span></li>
+      <li>Extend to top-tier AEC firms only after a signed HR letter confirming their own background-check process <span class="note">(contracts currently lack this language)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<!-- ============ TOP NAV ============ -->
+<nav class="top-nav">
+  <div class="tn-left">
+    <span class="tn-logo">CIVILGRID</span>
+    <div class="tn-switcher">
+      <span>Admin</span>
+      <svg viewBox="0 0 9 6" fill="#393b3d"><path d="M0 0l4.5 6L9 0z"/></svg>
+    </div>
+  </div>
+  <div class="tn-right">
+    <div class="tn-icon-btn" title="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </div>
+    <div class="tn-icon-btn" title="Help">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div class="tn-avatar" title="Nathan Stankowski">NS</div>
+  </div>
+</nav>
+
+<div class="app-body">
+  <!-- ============ LEFT NAV ============ -->
+  <aside class="left-nav">
+    <a class="ln-home" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#196fe0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      <span class="txt">Home</span>
+    </a>
+    <div class="ln-scroll">
+      <div class="ln-section-title">Projects</div>
+      <div class="ln-section">
+        <a class="ln-item" href="#">Transactions</a>
+        <a class="ln-item" href="#">Move Project</a>
+      </div>
+      <div class="ln-divider"></div>
+      <div class="ln-section-title">Organizations</div>
+      <div class="ln-section">
+        <a class="ln-item" href="#">Create Organization</a>
+        <a class="ln-item" href="#">Create Sandbox Org</a>
+        <a class="ln-item" href="#">Manage Project Billing</a>
+        <a class="ln-item" href="#">Update Organization Subscription</a>
+        <a class="ln-item" href="#">Join Org</a>
+      </div>
+      <div class="ln-divider"></div>
+      <div class="ln-section-title">Users</div>
+      <div class="ln-section">
+        <a class="ln-item" href="#">Unapproved Users</a>
+        <a class="ln-item active" href="#">Pre-Approved Domains</a>
+      </div>
+      <div class="ln-divider"></div>
+      <div class="ln-section-title">CivilSearch</div>
+      <div class="ln-section">
+        <a class="ln-item" href="#">Civil Searchers</a>
+        <a class="ln-item" href="#">Data Requests</a>
+        <a class="ln-item" href="#">Agencies</a>
+        <a class="ln-item" href="#">Projects</a>
+      </div>
+      <div class="ln-divider"></div>
+      <div class="ln-section-title">Engineering</div>
+      <div class="ln-section">
+        <a class="ln-item" href="#">🛸 Tools</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN CONTENT ============ -->
+  <main class="content">
+    <div class="content-inner">
+      <div class="page-title">Pre-Approved Domains</div>
+
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div class="major-heading">Pre-Approved Domains</div>
+        <p class="desc-text">Add a domain and users invited with a matching email domain will be automatically approved.</p>
+
+        <div class="add-row">
+          <div class="add-field">
+            <input id="domain-input" class="add-input" type="text" placeholder="e.g. acme.com" oninput="onInputChange()" onkeydown="if(event.key==='Enter')handleAddClick()">
+            <span id="add-error" class="add-error" style="display:none;"></span>
+          </div>
+          <button id="add-btn" class="btn btn-disabled" disabled onclick="handleAddClick()">Add Domain</button>
+        </div>
+
+        <div id="empty-state" class="empty-state">
+          <div class="empty-title">No domains whitelisted yet</div>
+          <div class="empty-sub">Add a domain above to get started.</div>
+        </div>
+
+        <div id="table-wrap" style="display:none;">
+          <table class="domains-table">
+            <thead>
+              <tr>
+                <th>Domain</th>
+                <th>Added</th>
+                <th>Auto-Approved Users</th>
+                <th>Removed</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="domains-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ CONFIRM DIALOG ============ -->
+<div class="dlg-overlay" id="dlg-overlay">
+  <div class="dlg-content">
+    <div class="dlg-head">
+      <div class="dlg-title">Confirm Background Verification</div>
+      <button class="dlg-close" onclick="closeDialog()" aria-label="Close">&times;</button>
+    </div>
+    <div class="dlg-body">
+      <div class="dlg-warn">You are about to whitelist <strong id="dlg-domain"></strong>. All future users with this domain will be automatically approved without manual review.</div>
+      <label class="dlg-checkbox-row">
+        <input type="checkbox" id="dlg-checkbox" onchange="onConfirmToggle()">
+        <span>I confirm that I have received <strong>written proof</strong> that all members of this domain have had their backgrounds verified, and that a copy has been saved on file.</span>
+      </label>
+    </div>
+    <div class="dlg-footer">
+      <button id="dlg-confirm-btn" class="btn btn-disabled" disabled onclick="handleConfirm()">Confirm &amp; Add Domain</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FEEDBACK PANE ============ -->
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+  /* ===== Build stamp ===== */
+  const BUILD = 1;
+  const BUILD_DATE = "Jul 9, 2026";
+  document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+  /* ===== About panel ===== */
+  function toggleInfo() {
+    const ip = document.getElementById('info-panel');
+    const willOpen = !ip.classList.contains('open');
+    ip.classList.toggle('open');
+    if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+  }
+
+  /* ===== Feedback (shared Prototype Feedback Google Form) ===== */
+  const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+  const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+  const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+  const PROTOTYPE_NAME = "Pre-Approved Domains";
+  window.__activeScreen = PROTOTYPE_NAME;
+  function fbUrl(embedded) {
+    const u = new URL(FEEDBACK_FORM_BASE);
+    if (embedded) u.searchParams.set("embedded", "true");
+    u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+    u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+    u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+    return u.toString();
+  }
+  function fbOpen() {
+    document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+    document.getElementById('fb-frame').src = fbUrl(true);
+    document.getElementById('fb-newtab').href = fbUrl(false);
+    document.getElementById('info-panel').classList.remove('open');
+    document.getElementById('fb-pane').classList.add('open');
+  }
+  function fbClose() { document.getElementById('fb-pane').classList.remove('open'); }
+  document.getElementById('fb-open').onclick = fbOpen;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { fbClose(); closeDialog(); } });
+
+  /* ===== Domain whitelist logic — mirrors packages/client/src/pages/admin/preApprovedOrgs/index.tsx ===== */
+  const domainRegex = /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}$/;
+  let domains = [
+    { id: 'seed-1', domain: 'northgate-power.com', addedAt: 'Jun 12, 2026', removedAt: null, autoApprovedCount: 3 },
+  ];
+  let pendingDomain = null;
+
+  function today() {
+    return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function onInputChange() {
+    const val = document.getElementById('domain-input').value.trim();
+    const btn = document.getElementById('add-btn');
+    btn.disabled = !val;
+    btn.className = val ? 'btn btn-primary' : 'btn btn-disabled';
+    document.getElementById('add-error').style.display = 'none';
+  }
+
+  function handleAddClick() {
+    const input = document.getElementById('domain-input');
+    const trimmed = input.value.trim().toLowerCase();
+    const errEl = document.getElementById('add-error');
+    if (!trimmed) return;
+
+    if (!domainRegex.test(trimmed)) {
+      errEl.textContent = 'Enter a valid domain (e.g. acme.com)';
+      errEl.style.display = 'inline';
+      return;
+    }
+    if (domains.some(d => d.domain === trimmed && !d.removedAt)) {
+      errEl.textContent = 'That domain is already whitelisted.';
+      errEl.style.display = 'inline';
+      return;
+    }
+
+    pendingDomain = trimmed;
+    document.getElementById('dlg-domain').textContent = trimmed;
+    document.getElementById('dlg-checkbox').checked = false;
+    onConfirmToggle();
+    document.getElementById('dlg-overlay').classList.add('open');
+    window.__activeScreen = 'Confirm Background Verification (modal)';
+  }
+
+  function closeDialog() {
+    document.getElementById('dlg-overlay').classList.remove('open');
+    pendingDomain = null;
+    window.__activeScreen = PROTOTYPE_NAME;
+  }
+
+  function onConfirmToggle() {
+    const checked = document.getElementById('dlg-checkbox').checked;
+    const btn = document.getElementById('dlg-confirm-btn');
+    btn.disabled = !checked;
+    btn.className = checked ? 'btn btn-primary' : 'btn btn-disabled';
+  }
+
+  function handleConfirm() {
+    const checked = document.getElementById('dlg-checkbox').checked;
+    if (!pendingDomain || !checked) return;
+    domains.push({ id: 'd-' + Date.now(), domain: pendingDomain, addedAt: today(), removedAt: null, autoApprovedCount: 0 });
+    document.getElementById('domain-input').value = '';
+    onInputChange();
+    document.getElementById('dlg-overlay').classList.remove('open');
+    pendingDomain = null;
+    window.__activeScreen = PROTOTYPE_NAME;
+    renderTable();
+  }
+
+  function handleRemove(id) {
+    domains = domains.map(d => d.id === id ? { ...d, removedAt: today() } : d);
+    renderTable();
+  }
+
+  function renderTable() {
+    const active = domains.filter(d => !d.removedAt);
+    const removed = domains.filter(d => d.removedAt);
+    const tbody = document.getElementById('domains-tbody');
+    const emptyState = document.getElementById('empty-state');
+    const tableWrap = document.getElementById('table-wrap');
+
+    if (domains.length === 0) {
+      emptyState.style.display = 'flex';
+      tableWrap.style.display = 'none';
+      return;
+    }
+    emptyState.style.display = 'none';
+    tableWrap.style.display = 'block';
+
+    const rows = active.map(d => `
+      <tr class="active-row">
+        <td class="cell-domain">${d.domain}</td>
+        <td class="cell-muted">${d.addedAt}</td>
+        <td>${d.autoApprovedCount}</td>
+        <td class="cell-dash">—</td>
+        <td class="cell-remove-wrap"><button class="remove-link" onclick="handleRemove('${d.id}')">Remove</button></td>
+      </tr>
+    `).join('') + removed.map(d => `
+      <tr class="removed-row">
+        <td class="cell-domain">${d.domain}</td>
+        <td class="cell-muted">${d.addedAt}</td>
+        <td class="cell-muted">${d.autoApprovedCount}</td>
+        <td class="cell-muted">${d.removedAt}</td>
+        <td></td>
+      </tr>
+    `).join('');
+    tbody.innerHTML = rows;
+  }
+
+  renderTable();
+</script>
+</body>
+</html>
