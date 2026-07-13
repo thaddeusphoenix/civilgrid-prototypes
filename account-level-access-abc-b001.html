@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  BUILD b001 · Jul 13, 2026
+  Build history (newest first):
+    b001 · Jul 13, 2026 — initial build. A new "Account" entity above Orgs, reached from a new
+      "Account Settings" item in the top-nav profile menu. The Account console's main surface is
+      "Projects & Access" — housing access to ALL projects across every org under the account.
+      Explores three structures for that surface via an A/B/C toggle in the Prototype bar, all over
+      the same fictional enterprise (Northwind Energy — Gas Distribution, Gas Transmission, Electric,
+      Land Management):
+        A — Direct grants: one flat table of every project; access granted project-by-project;
+            projects can be multi-homed across orgs (the duplicate-billing scenario). ACL / Model-B.
+        B — Group cascade: Account → Org Group → Org → Project tree; grant at any node, cascades
+            down; inherited access shown on children. RBAC-via-groups / Model-A hierarchy.
+        C — Attribute rules: access defined as rules over project attributes (Region / Division /
+            Customer / Project Type — the same fields as member-access-scope-b006), matched
+            automatically. ABAC / single-org-with-layers.
+      Sibling to member-access-scope-b006.html (which scoped people within one org); this scopes
+      access to projects across an enterprise. Grounded in CivilGrid's enterprise org-structure
+      discovery.
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account-Level Access — Projects & Access</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Noto Sans", system-ui, -apple-system, sans-serif; background: #f4f5f5; color: #1d1e20; padding-top: 32px; font-size: 14px; }
+
+  /* ===== Prototype bar ===== */
+  .proto-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 32px; background: #243442; display: flex; align-items: center; justify-content: center; padding: 0 16px; gap: 12px; user-select: none; }
+  .proto-badge { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: none; padding: 0; color: #f27e31; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .proto-build { flex-shrink: 0; color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  .proto-desc { font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; padding: 2px 6px; }
+  .proto-actions { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+  .proto-about-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; animation: fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse { 0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); } 50% { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); } }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+
+  /* A/B/C variant toggle */
+  .abc-toggle { display: inline-flex; align-items: center; gap: 6px; }
+  .abc-toggle .abc-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.4); font-weight: 700; }
+  .abc-seg { display: inline-flex; border: 1px solid rgba(255,255,255,0.28); border-radius: 12px; overflow: hidden; }
+  .abc-seg button { border: none; background: transparent; color: rgba(255,255,255,0.7); font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 11px; cursor: pointer; border-right: 1px solid rgba(255,255,255,0.18); }
+  .abc-seg button:last-child { border-right: none; }
+  .abc-seg button:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .abc-seg button.on { background: #f27e31; color: #fff; }
+
+  /* ===== Info panel ===== */
+  .info-panel { display: none; position: fixed; top: 32px; right: 0; width: 360px; background: #ffffff; border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px; padding: 16px; z-index: 199; box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px; color: #393b3d; line-height: 1.5; max-height: calc(100vh - 40px); overflow-y: auto; }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-section .v { font-weight: 600; color: #1d1e20; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  /* ===== Feedback pane ===== */
+  .fb-pane { display: none; position: fixed; top: 32px; right: 0; bottom: 0; width: 440px; max-width: 92vw; background: #fff; border-left: 1px solid #d2d4d7; box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199; flex-direction: column; overflow: hidden; }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+
+  /* ===== Top nav ===== */
+  .top-nav { position: sticky; top: 32px; z-index: 100; height: 48px; background: #ffffff; border-bottom: 1px solid #d2d4d7; display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+  .logo { color: #f27e31; font-size: 18px; font-weight: 800; letter-spacing: 1px; }
+  .nav-page { font-size: 14px; color: #393b3d; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .nav-page .chev { font-size: 10px; color: #888c90; }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+  .nav-ico { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #888c90; color: #888c90; font-size: 12px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+  .nav-badge { position: absolute; top: -6px; right: -6px; background: #d61e17; color: #fff; font-size: 9px; font-weight: 700; min-width: 15px; height: 15px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 3px; border: 1.5px solid #fff; }
+  .nav-avatar { width: 28px; height: 28px; border-radius: 50%; background: #243442; color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+  /* profile menu */
+  .pm-wrap { position: relative; }
+  .profile-menu { display: none; position: absolute; top: 38px; right: 0; width: 264px; background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 6px 0; z-index: 150; }
+  .profile-menu.open { display: block; }
+  .pm-id { padding: 10px 16px 12px; border-bottom: 1px solid #e9eaeb; margin-bottom: 6px; }
+  .pm-id .pm-name { font-size: 14px; font-weight: 600; color: #1d1e20; }
+  .pm-id .pm-email { font-size: 12px; color: #656e75; }
+  .pm-item { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 14px; color: #1d1e20; cursor: pointer; }
+  .pm-item:hover { background: #f4f5f5; }
+  .pm-item.muted { color: #656e75; }
+  .pm-item .pm-new { margin-left: auto; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #0b7a09; background: #c8f5d2; border-radius: 9999px; padding: 1px 7px; }
+  .pm-item.here { background: #eaf5ff; color: #134a91; font-weight: 500; }
+  .pm-sep { height: 1px; background: #e9eaeb; margin: 6px 0; }
+
+  /* ===== Layout ===== */
+  .shell { display: flex; min-height: calc(100vh - 80px); }
+  .left-nav { width: 224px; flex-shrink: 0; background: #fff; border-right: 1px solid #d2d4d7; padding: 16px 0; }
+  .ln-back { display: flex; align-items: center; gap: 6px; color: #196fe0; font-size: 14px; padding: 4px 20px 14px; cursor: pointer; }
+  .ln-org { display: flex; align-items: flex-start; gap: 10px; padding: 0 20px 16px; }
+  .ln-org-bar { width: 3px; height: 34px; background: #f27e31; border-radius: 2px; }
+  .ln-org-name { font-size: 16px; font-weight: 600; color: #1d1e20; }
+  .ln-org-kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 600; margin-top: 1px; }
+  .ln-item { display: flex; align-items: center; padding: 8px 20px; font-size: 14px; color: #1d1e20; cursor: pointer; }
+  .ln-item:hover { background: #e9eaeb; }
+  .ln-item.active { background: #eaf5ff; color: #134a91; font-weight: 500; box-shadow: inset 2px 0 0 #196fe0; }
+  .ln-item .ln-count { margin-left: auto; font-size: 11px; color: #888c90; font-weight: 600; }
+  .ln-section { font-size: 13px; font-weight: 500; color: #656e75; padding: 16px 20px 6px; }
+
+  .main { flex: 1; padding: 24px 36px 60px; min-width: 0; }
+  .btn { font-family: inherit; font-size: 14px; font-weight: 500; border-radius: 4px; padding: 7px 14px; cursor: pointer; border: 1px solid transparent; }
+  .btn-primary { background: #243442; color: #fff; }
+  .btn-primary:hover { background: #1f2c38; }
+  .btn-hollow { background: #fff; color: #393b3d; border-color: #d2d4d7; }
+  .btn-hollow:hover { background: #f4f5f5; }
+  .btn-danger { background: #fff; color: #d61e17; border-color: #f5cdcb; }
+  .btn-danger:hover { background: #ffefee; }
+  .btn-sm { font-size: 12px; padding: 5px 12px; }
+  .btn-primary:disabled { opacity: 0.45; cursor: default; }
+
+  .page-head { margin-bottom: 8px; }
+  .page-h { font-size: 20px; font-weight: 600; color: #1d1e20; }
+  .page-actions { display: flex; align-items: center; gap: 12px; margin: 6px 0 16px; }
+
+  /* variant caption */
+  .variant-cap { display: flex; gap: 12px; background: #fff; border: 1px solid #d2d4d7; border-left: 3px solid #f27e31; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; max-width: 940px; }
+  .variant-cap .vc-tag { flex-shrink: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #f27e31; }
+  .variant-cap .vc-body { font-size: 13px; color: #54585b; line-height: 1.5; }
+  .variant-cap .vc-body b { color: #1d1e20; font-weight: 600; }
+
+  /* avatars */
+  .avstack { display: inline-flex; align-items: center; }
+  .av { width: 24px; height: 24px; border-radius: 50%; background: #243442; color: #fff; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid #fff; margin-left: -6px; }
+  .av:first-child { margin-left: 0; }
+  .av.ext { background: #6e7376; }
+  .av.more { background: #e9eaeb; color: #54585b; }
+
+  /* chips */
+  .org-chip { display: inline-flex; align-items: center; font-size: 12px; padding: 2px 9px; border-radius: 9999px; background: #f4f5f5; border: 1px solid #d2d4d7; color: #393b3d; white-space: nowrap; margin-right: 4px; }
+  .flag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 9999px; }
+  .flag.shared { background: #ffefbb; color: #db9c13; }
+  .attr-chip { display: inline-flex; align-items: center; font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: #f4f5f5; border: 1px solid #e9eaeb; color: #54585b; white-space: nowrap; }
+  .attr-chip.geo { background: #e8fcec; border-color: #c8f5d2; color: #0b7a09; }
+
+  /* ===== Variant A — projects table ===== */
+  table.grid { width: 100%; border-collapse: collapse; }
+  table.grid th { text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: #888c90; padding: 6px 12px 8px 0; border-bottom: 1px solid #e9eaeb; }
+  table.grid td { font-size: 14px; color: #1d1e20; padding: 11px 12px 11px 0; border-bottom: 1px solid #f0f1f1; vertical-align: middle; }
+  table.grid tr:hover td { background: #fafbfb; }
+  .col-chk { width: 34px; padding-right: 0; }
+  .col-chk input { width: 16px; height: 16px; cursor: pointer; accent-color: #243442; }
+  .col-proj { font-weight: 500; }
+  .col-proj .proj-sub { font-size: 12px; color: #888c90; font-weight: 400; margin-top: 1px; }
+  .col-orgs { width: 26%; }
+  .col-access { width: 30%; }
+  .col-gear { width: 100px; text-align: right; }
+  .access-cell { display: flex; align-items: center; gap: 8px; cursor: pointer; border-radius: 6px; padding: 3px 4px; }
+  table.grid tr:hover .access-cell { box-shadow: inset 0 0 0 1px #c0dbfe; }
+  .access-cell .ac-count { font-size: 12px; color: #656e75; }
+  .access-all { font-size: 12px; padding: 3px 9px; border-radius: 9999px; background: #eaf5ff; border: 1px solid #c0dbfe; color: #134a91; font-weight: 500; }
+  .gear { width: 28px; height: 28px; border-radius: 4px; border: 1px solid #d2d4d7; background: #fff; color: #54585b; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; opacity: 0.65; }
+  table.grid tr:hover .gear { opacity: 1; }
+  .gear:hover { background: #f4f5f5; border-color: #196fe0; color: #196fe0; }
+
+  .bulk-bar { display: none; align-items: center; justify-content: space-between; gap: 12px; background: #eaf5ff; border: 1px solid #c0dbfe; border-radius: 6px; padding: 8px 14px; margin-bottom: 10px; }
+  .bulk-bar.show { display: flex; }
+  .bulk-bar #bulk-count { font-size: 13px; font-weight: 600; color: #134a91; }
+
+  /* ===== Variant B — tree ===== */
+  .tree { max-width: 940px; }
+  .tnode-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 6px; }
+  .tnode-row:hover { background: #fafbfb; }
+  .tnode-row:hover .tn-grant { opacity: 1; }
+  .tn-caret { width: 16px; text-align: center; font-size: 10px; color: #888c90; cursor: pointer; flex-shrink: 0; user-select: none; }
+  .tn-caret.leaf { visibility: hidden; }
+  .tn-icon { font-size: 12px; }
+  .tn-name { font-weight: 500; color: #1d1e20; }
+  .tn-kind { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 1px 7px; border-radius: 9999px; }
+  .tn-kind.acct { background: #f7d0ae; color: #da712c; }
+  .tn-kind.group { background: #c0dbfe; color: #134a91; }
+  .tn-kind.org { background: #e9eaeb; color: #54585b; }
+  .tn-meta { font-size: 12px; color: #888c90; }
+  .tn-grants { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+  .tn-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .tn-grant { border: 1px solid #d2d4d7; background: #fff; color: #393b3d; font-family: inherit; font-size: 12px; font-weight: 500; border-radius: 4px; padding: 4px 10px; cursor: pointer; opacity: 0.55; }
+  .tn-grant:hover { border-color: #196fe0; color: #196fe0; opacity: 1; }
+  .tchildren { border-left: 1px solid #e9eaeb; margin-left: 19px; padding-left: 6px; }
+  .tproj { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; }
+  .tproj:hover { background: #fafbfb; }
+  .tproj .tp-name { color: #1d1e20; }
+  .tproj .tp-attrs { display: flex; gap: 5px; }
+  .tproj .tp-viewers { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .via { font-size: 11px; color: #888c90; }
+  .via b { color: #54585b; font-weight: 600; }
+
+  /* ===== Variant C — rules ===== */
+  .rules-wrap { max-width: 940px; }
+  .rule-card { background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+  .rc-head { display: flex; align-items: center; gap: 10px; }
+  .rc-subject { font-size: 15px; font-weight: 600; color: #1d1e20; }
+  .rc-count { font-size: 12px; font-weight: 600; color: #0b7a09; background: #e8fcec; border: 1px solid #c8f5d2; border-radius: 9999px; padding: 2px 10px; }
+  .rc-right { margin-left: auto; display: flex; gap: 6px; }
+  .rc-mini { border: 1px solid #d2d4d7; background: #fff; color: #54585b; font-family: inherit; font-size: 12px; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+  .rc-mini:hover { border-color: #196fe0; color: #196fe0; }
+  .rc-sentence { font-size: 13px; color: #54585b; line-height: 1.5; margin-top: 8px; }
+  .rc-sentence b { color: #134a91; font-weight: 600; }
+  .rc-matches { margin-top: 12px; border-top: 1px dashed #e9eaeb; padding-top: 10px; display: none; }
+  .rc-matches.open { display: block; }
+  .rc-matches .rm-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; margin-bottom: 6px; }
+  .rc-match { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; color: #1d1e20; }
+  .rc-match .rm-org { font-size: 12px; color: #888c90; }
+
+  /* ===== Overview / People / Orgs ===== */
+  .stat-row { display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+  .stat-card { background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; padding: 16px 20px; min-width: 150px; }
+  .stat-card .sc-num { font-size: 28px; font-weight: 700; color: #1d1e20; }
+  .stat-card .sc-lbl { font-size: 12px; color: #656e75; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+  .note-box { background: #fffbef; border: 1px solid #ffefbb; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #54585b; line-height: 1.5; max-width: 760px; }
+  .note-box b { color: #1d1e20; }
+
+  /* ===== Modals (shared) ===== */
+  .scrim { display: none; position: fixed; inset: 0; background: rgba(29,30,32,0.4); z-index: 300; align-items: flex-start; justify-content: center; padding: 60px 16px; overflow-y: auto; }
+  .scrim.open { display: flex; }
+  .modal { background: #fff; border-radius: 8px; width: 600px; max-width: 96vw; box-shadow: 0 16px 48px rgba(0,0,0,0.25); }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 14px; border-bottom: 1px solid #e9eaeb; }
+  .modal-head .mh-title { font-size: 16px; font-weight: 600; color: #1d1e20; }
+  .modal-head .mh-sub { font-size: 12px; color: #888c90; margin-top: 2px; }
+  .modal-close { border: none; background: none; font-size: 22px; color: #888c90; cursor: pointer; line-height: 1; }
+  .modal-close:hover { color: #1d1e20; }
+  .modal-body { padding: 20px 22px; }
+  .field-label { font-size: 12px; font-weight: 600; color: #393b3d; margin-bottom: 7px; display: block; }
+  .helper { font-size: 12px; color: #656e75; line-height: 1.5; margin-bottom: 14px; }
+  .helper b { color: #1d1e20; }
+  .ppl-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ppl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 12px 6px 8px; border-radius: 9999px; background: #fff; border: 1px solid #d2d4d7; color: #54585b; cursor: pointer; user-select: none; }
+  .ppl:hover { border-color: #888c90; }
+  .ppl.on { background: #eaf5ff; border-color: #196fe0; color: #134a91; font-weight: 500; }
+  .ppl .ppl-role { font-size: 11px; color: #888c90; }
+  .ppl.on .ppl-role { color: #5a7fa8; }
+
+  .select { font-family: inherit; font-size: 14px; color: #1d1e20; padding: 8px 10px; border: 1px solid #d2d4d7; border-radius: 4px; background: #fff; min-width: 260px; }
+  .ed-field { margin-bottom: 15px; }
+  .ed-field-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .ed-field-name { font-size: 13px; font-weight: 600; color: #1d1e20; }
+  .ed-field-mini { font-size: 11px; color: #888c90; }
+  .opts { display: flex; flex-wrap: wrap; gap: 7px; }
+  .opt { font-size: 12px; padding: 5px 12px; border-radius: 9999px; background: #fff; border: 1px solid #d2d4d7; color: #54585b; cursor: pointer; user-select: none; transition: all 0.1s; }
+  .opt:hover { border-color: #888c90; }
+  .opt.on { background: #243442; border-color: #243442; color: #fff; }
+  .opt.all-toggle.on { background: #196fe0; border-color: #196fe0; }
+  .opt.geo::before { content: "\25C8  "; opacity: 0.7; }
+  .ed-summary { background: #eaf5ff; border: 1px solid #c0dbfe; border-radius: 8px; padding: 12px 14px; margin-top: 8px; }
+  .ed-summary .es-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: #5a7fa8; margin-bottom: 5px; }
+  .ed-summary .es-sentence { font-size: 13px; color: #134a91; line-height: 1.55; }
+  .ed-summary .es-sentence b { font-weight: 700; }
+  .ed-summary .es-count { font-size: 12px; color: #134a91; margin-top: 6px; font-weight: 600; }
+  .modal-foot { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px; border-top: 1px solid #e9eaeb; }
+  .modal-foot .right { display: flex; gap: 10px; }
+  .modal-foot .del { }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Account-level access</span>
+  <div class="abc-toggle">
+    <span class="abc-lbl">Structure</span>
+    <span class="abc-seg">
+      <button id="abc-A" class="on" onclick="setVariant('A')">A · Direct grants</button>
+      <button id="abc-B" onclick="setVariant('B')">B · Group cascade</button>
+      <button id="abc-C" onclick="setVariant('C')">C · Attribute rules</button>
+    </span>
+  </div>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Account-level access — Projects &amp; Access</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>A new top-level <b>Account</b> entity sits above a customer's Orgs and is reached from a new <b>Account Settings</b> item in the profile menu. Its main job is to house access to <b>all projects across every org</b>. This prototype puts three structures for that surface behind an <span class="v">A / B / C</span> toggle — the open question is which one to build.</p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li>Open the <b>NS</b> avatar (top right) — the new <b>Account Settings</b> item is the entry point into this console.</li>
+    <li>Everything is one fictional enterprise (<b>Northwind Energy</b>, 4 orgs). The A/B/C toggle changes only how <b>Projects &amp; Access</b> is structured — same underlying data.</li>
+    <li><b>A · Direct grants</b> — one flat table of every project; grant access per project (gear or click the access cell), or select rows and bulk-add. Projects can be <b>shared across orgs</b> (the duplicate-work / duplicate-billing case).</li>
+    <li><b>B · Group cascade</b> — Account → Org Group → Org → Project tree; <b>Grant</b> at any node and it cascades down. Projects show where their access came from (<i>via Account</i>, <i>via Land Services</i>…).</li>
+    <li><b>C · Attribute rules</b> — access is <b>rules</b> over project attributes (Region / Division / Customer / Project Type — the same fields as member-access-scope-b006), matched automatically. Add a rule and watch the matching-project count.</li>
+  </ul></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b001</b> — initial build (A/B/C account access structures over one enterprise)</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Introduce Account as the top-level entity above Orgs; one Account per enterprise buyer</li>
+      <li>Link existing Orgs to a parent Account; migrate multi-org customers with many separate orgs under one Account</li>
+      <li>Account-admin role: manage orgs, people, and access across the Account without CivilGrid staff</li>
+      <li>(A) Allow a project to be homed in more than one Org; resolve billing attribution for shared projects</li>
+      <li>(B) Add an Org Group tier; model Account → Org Group → Org; define grant inheritance / cascade</li>
+      <li>(C) Tag every project with structured attributes (Region, Division, Customer, Project Type); backfill existing projects</li>
+    </ul></div>
+    <div class="grp"><b>Account console UI</b><ul>
+      <li>Add "Account Settings" to the profile menu; build the Account console shell (Overview / Projects &amp; Access / People / Orgs)</li>
+      <li>(A) All-projects table across orgs with per-project people grants + bulk apply</li>
+      <li>(B) Collapsible Account→Group→Org→Project tree; grant at any node; show inherited access on children</li>
+      <li>(C) Access-rule builder over project attributes with a live matching-project preview and counts</li>
+      <li>Account Overview rollup (orgs, project counts, members) for the economic buyer</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app (the real change)</b><ul>
+      <li>Filter project visibility across orgs by the chosen access model, server-side</li>
+      <li>Cross-org project query + duplicate-boundary detection before a project is created</li>
+      <li>Access lifecycle for external grants — expiry, revoke, audit trail (Access Grant object)</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Which structure — direct grants (A) vs. group cascade (B) vs. attribute rules (C)? <span class="note">(this prototype's question)</span></li>
+      <li>Account alone, or Account + Org Group as the tier? <span class="note">(product + engineering; architecture decision)</span></li>
+      <li>Does Account change billing / the duplicate-charge problem for shared projects? <span class="note">(open — product + eng)</span></li>
+      <li>Is "Org Group" the right customer vocabulary — Division / Region / Portfolio? <span class="note">(open — customer calls)</span></li>
+      <li>Does access travel with the person, or with a role that carries a default scope? <span class="note">(open)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<nav class="top-nav">
+  <span class="logo">CIVILGRID</span>
+  <span class="nav-page" id="nav-crumb">Account <span class="chev">&#9662;</span></span>
+  <div class="nav-right">
+    <span class="nav-ico">&#128276;<span class="nav-badge">9+</span></span>
+    <span class="nav-ico">?</span>
+    <span class="pm-wrap">
+      <span class="nav-avatar" id="avatar" onclick="toggleProfile(event)">EC</span>
+      <div class="profile-menu" id="profile-menu">
+        <div class="pm-id"><div class="pm-name">Elena Cruz</div><div class="pm-email">elena.cruz@northwind.example</div></div>
+        <div class="pm-item muted">Admin Tools (Internal Only)</div>
+        <div class="pm-item muted">Support</div>
+        <div class="pm-sep"></div>
+        <div class="pm-item here" onclick="gotoAccount()">Account Settings <span class="pm-new">New</span></div>
+        <div class="pm-item muted">Organization Settings</div>
+        <div class="pm-sep"></div>
+        <div class="pm-item muted">Logout</div>
+      </div>
+    </span>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="left-nav">
+    <div class="ln-back">&#8592; Back to app</div>
+    <div class="ln-org"><span class="ln-org-bar"></span><span><span class="ln-org-name">Northwind Energy</span><div class="ln-org-kind">Account</div></span></div>
+    <div class="ln-item" id="nav-overview" onclick="switchNav('overview')">Overview</div>
+    <div class="ln-item active" id="nav-projects" onclick="switchNav('projects')">Projects &amp; Access <span class="ln-count" id="proj-count"></span></div>
+    <div class="ln-item" id="nav-people" onclick="switchNav('people')">People</div>
+    <div class="ln-item" id="nav-orgs" onclick="switchNav('orgs')">Orgs</div>
+  </aside>
+
+  <main class="main">
+    <div id="content"><!-- injected --></div>
+  </main>
+</div>
+
+<!-- Manage access modal (Variant A) -->
+<div class="scrim" id="ma-scrim">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div><span class="mh-title" id="ma-title">Manage access</span><div class="mh-sub" id="ma-sub"></div></div>
+      <button class="modal-close" onclick="closeMA()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="helper">Choose who can see this project. In this model access is set <b>project by project</b> — there's no org or group tier doing it for you.</div>
+      <label class="field-label">People with access</label>
+      <div class="ppl-grid" id="ma-people"></div>
+    </div>
+    <div class="modal-foot"><span></span><div class="right">
+      <button class="btn btn-hollow" onclick="closeMA()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMA()">Save access</button>
+    </div></div>
+  </div>
+</div>
+
+<!-- Grant access modal (Variant B) -->
+<div class="scrim" id="gr-scrim">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div><span class="mh-title" id="gr-title">Grant access</span><div class="mh-sub" id="gr-sub"></div></div>
+      <button class="modal-close" onclick="closeGR()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="helper" id="gr-helper"></div>
+      <label class="field-label">People granted at this level</label>
+      <div class="ppl-grid" id="gr-people"></div>
+    </div>
+    <div class="modal-foot"><span></span><div class="right">
+      <button class="btn btn-hollow" onclick="closeGR()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGR()">Save grant</button>
+    </div></div>
+  </div>
+</div>
+
+<!-- Rule builder modal (Variant C) -->
+<div class="scrim" id="ru-scrim">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div><span class="mh-title" id="ru-title">Access rule</span><div class="mh-sub">Access is granted to everything that matches — automatically, as projects are created.</div></div>
+      <button class="modal-close" onclick="closeRU()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Give access to</label>
+      <select class="select" id="ru-subject"></select>
+      <div style="height:18px;"></div>
+      <label class="field-label">Projects matching these attributes</label>
+      <div class="helper">Leave a field on <b>Any</b> to not restrict by it. A project must match every field you set.</div>
+      <div id="ru-fields"></div>
+      <div class="ed-summary">
+        <div class="es-label">This rule grants access to</div>
+        <div class="es-sentence" id="ru-sentence"></div>
+        <div class="es-count" id="ru-count"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger del" id="ru-del" onclick="deleteRU()" style="visibility:hidden;">Delete rule</button>
+      <div class="right">
+        <button class="btn btn-hollow" onclick="closeRU()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveRU()">Save rule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head"><span>Feedback on: <b id="fb-ctx"></b></span><button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button></div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+  // ===== Build stamp =====
+  const BUILD = 1;
+  const BUILD_DATE = "Jul 13, 2026";
+  const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+  document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+  // ===== Enterprise data (fictional — publish-safe) =====
+  const PEOPLE = {
+    elena:  { name: "Elena Cruz",     email: "elena.cruz@northwind.example",   role: "Account Admin" },
+    dana:   { name: "Dana Whitfield", email: "dwhitfield@northwind.example",   role: "Project Manager" },
+    marcus: { name: "Marcus Reed",    email: "mreed@northwind.example",        role: "Project Manager" },
+    ben:    { name: "Ben Taylor",     email: "ben.taylor@northwind.example",   role: "Project Manager" },
+    tom:    { name: "Tom Becker",     email: "tom.becker@northwind.example",   role: "Project Manager" },
+    priya:  { name: "Priya Shah",     email: "priya.shah@northwind.example",   role: "Land Coordinator" },
+    sofia:  { name: "Sofia Marin",    email: "smarin@acme-potholing.example",  role: "Contractor (external)", ext: true },
+  };
+  const PEOPLE_ORDER = ["elena", "dana", "marcus", "ben", "tom", "priya", "sofia"];
+
+  const ORGS = {
+    gasd: { name: "Gas Distribution", group: "gasops" },
+    gast: { name: "Gas Transmission", group: "gasops" },
+    elec: { name: "Electric",         group: "elecops" },
+    land: { name: "Land Management",  group: "landsvc" },
+  };
+  const ORG_ORDER = ["gasd", "gast", "elec", "land"];
+
+  const GROUPS_B = {
+    gasops:  { name: "Gas Operations",      orgs: ["gasd", "gast"], grants: [] },
+    elecops: { name: "Electric Operations", orgs: ["elec"],         grants: [] },
+    landsvc: { name: "Land Services",       orgs: ["land"],         grants: ["priya"] },
+  };
+  const GROUP_ORDER = ["gasops", "elecops", "landsvc"];
+
+  // Account-level and org-level grants for the cascade model (Variant B)
+  const ACCOUNT_GRANTS = ["elena"];
+  const ORG_GRANTS = { gasd: ["dana", "marcus"], gast: ["ben"], elec: ["tom"], land: [] };
+
+  // Projects — one shared pool. accessA = direct grants (Variant A); accessB = project-level direct (Variant B)
+  const PROJECTS = [
+    { id: 1, name: "Cedar Ave Gas Main",          orgs: ["gasd"],         region: "West",    division: "Gas",      customer: "City of Fairmont", type: "Locate",           accessA: ["dana"],           accessB: [] },
+    { id: 2, name: "Riverside Regulator Upgrade",  orgs: ["gasd"],         region: "West",    division: "Gas",      customer: "City of Fairmont", type: "Survey",           accessA: ["dana", "marcus"], accessB: [] },
+    { id: 3, name: "Hwy 12 Transmission Reroute",  orgs: ["gast"],         region: "Central", division: "Gas",      customer: "Northstar Telecom",type: "Test Holes",       accessA: ["ben"],            accessB: [] },
+    { id: 4, name: "Northgate Substation",         orgs: ["elec"],         region: "West",    division: "Electric", customer: "Vela Networks",    type: "Survey",           accessA: ["tom"],            accessB: [] },
+    { id: 5, name: "Lakeshore Feeder Line",        orgs: ["elec"],         region: "North",   division: "Electric", customer: "City of Fairmont", type: "Locate",           accessA: ["tom"],            accessB: [] },
+    { id: 6, name: "Maple District Easements",     orgs: ["land"],         region: "West",    division: "Land",     customer: "City of Fairmont", type: "Survey",           accessA: ["priya"],          accessB: [] },
+    { id: 7, name: "Corridor 40 Title Research",   orgs: ["land"],         region: "Central", division: "Land",     customer: "Vela Networks",    type: "Records Research", accessA: ["priya"],          accessB: [] },
+    { id: 8, name: "Fairmont Downtown Joint Trench", orgs: ["gasd", "elec"], region: "West",  division: "Gas",      customer: "City of Fairmont", type: "Locate",           accessA: ["dana", "tom"],    accessB: [] },
+    { id: 9, name: "West Region Boundary Survey",  orgs: ["land"],         region: "West",    division: "Land",     customer: "City of Fairmont", type: "Survey",           accessA: ["priya", "sofia"], accessB: ["sofia"] },
+  ];
+
+  // Attribute fields for Variant C (mirror member-access-scope-b006)
+  const ATTR_FIELDS = [
+    { key: "region",   name: "Region",       geo: true,  values: ["West", "Central", "North"] },
+    { key: "division", name: "Division",     geo: false, values: ["Gas", "Electric", "Land"] },
+    { key: "customer", name: "Customer",     geo: false, values: ["City of Fairmont", "Vela Networks", "Northstar Telecom"] },
+    { key: "type",     name: "Project Type", geo: false, values: ["Locate", "Test Holes", "Survey", "Records Research"] },
+  ];
+  const SUBJECTS = [
+    "Elena Cruz — Account Admin", "Land Services team", "Gas Operations PMs",
+    "Electric Operations PMs", "West Region leads", "Sofia Marin — Contractor",
+  ];
+  function blankScope() { return { region: [], division: [], customer: [], type: [] }; }
+  let RULES = [
+    { subject: "Land Services team",           scope: { region: [], division: ["Land"], customer: [], type: [] } },
+    { subject: "Elena Cruz — Account Admin",   scope: blankScope() },
+  ];
+
+  // ===== Helpers =====
+  function initials(name) { return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase(); }
+  function av(id) { return '<span class="av' + (PEOPLE[id].ext ? " ext" : "") + '" title="' + PEOPLE[id].name + ' · ' + PEOPLE[id].role + '">' + initials(PEOPLE[id].name) + '</span>'; }
+  function avstack(ids) {
+    if (!ids.length) return '<span class="scope-muted" style="font-size:12px;color:#babdc0;">No one yet</span>';
+    let h = '<span class="avstack">' + ids.slice(0, 4).map(av).join("");
+    if (ids.length > 4) h += '<span class="av more">+' + (ids.length - 4) + '</span>';
+    return h + '</span>';
+  }
+  function attrChips(p) {
+    return '<span class="attr-chip geo">' + p.region + '</span>' +
+           '<span class="attr-chip">' + p.division + '</span>' +
+           '<span class="attr-chip">' + p.type + '</span>';
+  }
+  function ruleMatches(scope, p) {
+    return ATTR_FIELDS.every(f => { const sel = scope[f.key]; return !sel.length || sel.includes(p[f.key]); });
+  }
+
+  // ===== Variant state + dispatch =====
+  let currentVariant = "A";
+  let currentNav = "projects";
+  const VAR_LABEL = { A: "A · Direct grants", B: "B · Group cascade", C: "C · Attribute rules" };
+
+  function setVariant(v) {
+    currentVariant = v;
+    ["A", "B", "C"].forEach(x => document.getElementById("abc-" + x).classList.toggle("on", x === v));
+    if (currentNav !== "projects") { switchNav("projects"); return; }
+    setScreen();
+    render();
+  }
+  function switchNav(n) {
+    currentNav = n;
+    ["overview", "projects", "people", "orgs"].forEach(x =>
+      document.getElementById("nav-" + x).classList.toggle("active", x === n));
+    document.getElementById("nav-crumb").innerHTML = "Account <span class=\"chev\">&#9662;</span>";
+    setScreen();
+    render();
+  }
+  function setScreen() {
+    window.__activeScreen = currentNav === "projects"
+      ? "Projects & Access — " + VAR_LABEL[currentVariant]
+      : "Account — " + currentNav.charAt(0).toUpperCase() + currentNav.slice(1);
+  }
+
+  function render() {
+    document.getElementById("proj-count").textContent = PROJECTS.length;
+    if (currentNav === "overview") return renderOverview();
+    if (currentNav === "people") return renderPeople();
+    if (currentNav === "orgs") return renderOrgs();
+    // projects
+    if (currentVariant === "A") return renderA();
+    if (currentVariant === "B") return renderB();
+    return renderC();
+  }
+
+  function projectsHead(sub) {
+    return '<div class="page-head"><div class="page-h">Projects &amp; Access</div></div>' + sub;
+  }
+
+  // ===== Variant A — flat table + direct grants =====
+  let selA = new Set();
+  function renderA() {
+    let h = projectsHead(
+      '<div class="variant-cap"><span class="vc-tag">A · Direct grants</span><span class="vc-body">' +
+      'One flat list of <b>every project across all orgs</b>. Access is granted <b>project by project</b> — no hierarchy. ' +
+      'A project can live in more than one org (the <b>Shared</b> rows — the duplicate-work / double-billing case). ' +
+      'Simplest model and keeps the project first-class, but access is manual at scale.</span></div>');
+
+    h += '<div class="bulk-bar" id="bulk-bar"><span id="bulk-count"></span>' +
+      '<div><button class="btn btn-primary btn-sm" onclick="bulkAdd()">Add people to selected</button></div></div>';
+
+    h += '<table class="grid"><thead><tr>' +
+      '<th class="col-chk"><input type="checkbox" id="chk-all" onclick="toggleAllA(this)"></th>' +
+      '<th class="col-proj">Project</th><th class="col-orgs">Org(s)</th>' +
+      '<th class="col-access">Who can see it</th><th class="col-gear"></th></tr></thead><tbody>';
+
+    PROJECTS.forEach((p, i) => {
+      const shared = p.orgs.length > 1;
+      h += '<tr>' +
+        '<td class="col-chk"><input type="checkbox" ' + (selA.has(p.id) ? "checked" : "") + ' onclick="toggleA(' + p.id + ',this)"></td>' +
+        '<td class="col-proj">' + p.name + (shared ? '<div class="proj-sub">Shared project</div>' : '') + '</td>' +
+        '<td class="col-orgs">' + p.orgs.map(o => '<span class="org-chip">' + ORGS[o].name + '</span>').join("") +
+          (shared ? '<span class="flag shared">Shared</span>' : '') + '</td>' +
+        '<td class="col-access"><div class="access-cell" onclick="openMA(' + p.id + ')">' + avstack(p.accessA) +
+          '<span class="ac-count">' + p.accessA.length + ' ' + (p.accessA.length === 1 ? "person" : "people") + '</span></div></td>' +
+        '<td class="col-gear"><button class="gear" onclick="openMA(' + p.id + ')" title="Manage access">&#9881;</button></td>' +
+      '</tr>';
+    });
+    h += '</tbody></table>';
+    document.getElementById("content").innerHTML = h;
+    updateBulkBar();
+  }
+  function toggleA(id, el) { if (el.checked) selA.add(id); else selA.delete(id); updateBulkBar(); }
+  function toggleAllA(el) { selA = new Set(el.checked ? PROJECTS.map(p => p.id) : []); renderA(); }
+  function updateBulkBar() {
+    const bar = document.getElementById("bulk-bar");
+    if (!bar) return;
+    bar.classList.toggle("show", selA.size > 0);
+    if (selA.size) document.getElementById("bulk-count").textContent = selA.size + " project" + (selA.size === 1 ? "" : "s") + " selected";
+  }
+
+  // Manage-access modal (per project or bulk)
+  let maTarget = null; // project id, or "bulk"
+  let maSel = new Set();
+  function openMA(id) {
+    maTarget = id;
+    const p = PROJECTS.find(x => x.id === id);
+    maSel = new Set(p.accessA);
+    document.getElementById("ma-title").textContent = "Manage access";
+    document.getElementById("ma-sub").textContent = p.name + " · " + p.orgs.map(o => ORGS[o].name).join(" + ");
+    window.__activeScreen = "A · Manage access — " + p.name;
+    renderMApeople();
+    document.getElementById("ma-scrim").classList.add("open");
+  }
+  function bulkAdd() {
+    maTarget = "bulk";
+    maSel = new Set();
+    document.getElementById("ma-title").textContent = "Add people to selected projects";
+    document.getElementById("ma-sub").textContent = selA.size + " projects — chosen people are added to each";
+    window.__activeScreen = "A · Bulk add access";
+    renderMApeople();
+    document.getElementById("ma-scrim").classList.add("open");
+  }
+  function renderMApeople() {
+    document.getElementById("ma-people").innerHTML = PEOPLE_ORDER.map(id =>
+      '<span class="ppl ' + (maSel.has(id) ? "on" : "") + '" onclick="toggleMA(\'' + id + '\',this)">' +
+      av(id) + PEOPLE[id].name + ' <span class="ppl-role">' + PEOPLE[id].role + '</span></span>'
+    ).join("");
+  }
+  function toggleMA(id, el) { if (maSel.has(id)) maSel.delete(id); else maSel.add(id); el.classList.toggle("on"); }
+  function saveMA() {
+    if (maTarget === "bulk") {
+      PROJECTS.forEach(p => { if (selA.has(p.id)) maSel.forEach(id => { if (!p.accessA.includes(id)) p.accessA.push(id); }); });
+      selA = new Set();
+    } else {
+      const p = PROJECTS.find(x => x.id === maTarget);
+      p.accessA = PEOPLE_ORDER.filter(id => maSel.has(id));
+    }
+    closeMA(); renderA();
+  }
+  function closeMA() { document.getElementById("ma-scrim").classList.remove("open"); }
+
+  // ===== Variant B — cascade tree =====
+  let expanded = new Set(["acct", "grp:gasops", "grp:elecops", "grp:landsvc", "org:gasd", "org:gast", "org:elec", "org:land"]);
+  function caret(nid, hasKids) {
+    if (!hasKids) return '<span class="tn-caret leaf">&#9656;</span>';
+    return '<span class="tn-caret" onclick="toggleNode(\'' + nid + '\')">' + (expanded.has(nid) ? "&#9662;" : "&#9656;") + '</span>';
+  }
+  function grantChips(ids) { return ids.length ? '<span class="tn-grants">' + avstack(ids) + '</span>' : ''; }
+  function projectsUnderGroup(gid) { return PROJECTS.filter(p => GROUPS_B[gid].orgs.includes(p.orgs[0])).length; }
+  function projectsUnderOrg(oid) { return PROJECTS.filter(p => p.orgs[0] === oid).length; }
+
+  // effective viewers of a project (primary org home)
+  function effectiveViewers(p) {
+    const oid = p.orgs[0], gid = ORGS[oid].group, out = [];
+    ACCOUNT_GRANTS.forEach(id => out.push({ id, src: "Account" }));
+    GROUPS_B[gid].grants.forEach(id => out.push({ id, src: GROUPS_B[gid].name }));
+    ORG_GRANTS[oid].forEach(id => out.push({ id, src: ORGS[oid].name }));
+    p.accessB.forEach(id => out.push({ id, src: "this project" }));
+    // dedupe by id, keep first (highest) source
+    const seen = {}; return out.filter(x => seen[x.id] ? false : (seen[x.id] = true));
+  }
+
+  function renderB() {
+    let h = projectsHead(
+      '<div class="variant-cap"><span class="vc-tag">B · Group cascade</span><span class="vc-body">' +
+      'The account is a <b>tree</b>: Account → Org Group → Org → Projects. <b>Grant</b> access at any level and it ' +
+      '<b>cascades down</b> — add someone to a group and they see every project beneath it. Executive rollup falls out ' +
+      'of the structure, but every project has to sit in exactly one place.</span></div>');
+
+    h += '<div class="tree">';
+    // Account node
+    h += '<div class="tnode-row">' + caret("acct", true) +
+      '<span class="tn-icon">&#127970;</span><span class="tn-name">Northwind Energy</span>' +
+      '<span class="tn-kind acct">Account</span>' + grantChips(ACCOUNT_GRANTS) +
+      '<div class="tn-right"><span class="tn-meta">' + PROJECTS.length + ' projects</span>' +
+      '<button class="tn-grant" onclick="openGR(\'acct\',null)">Grant</button></div></div>';
+
+    if (expanded.has("acct")) {
+      h += '<div class="tchildren">';
+      GROUP_ORDER.forEach(gid => {
+        const g = GROUPS_B[gid], gnid = "grp:" + gid;
+        h += '<div class="tnode-row">' + caret(gnid, true) +
+          '<span class="tn-icon">&#128193;</span><span class="tn-name">' + g.name + '</span>' +
+          '<span class="tn-kind group">Org Group</span>' + grantChips(g.grants) +
+          '<div class="tn-right"><span class="tn-meta">' + projectsUnderGroup(gid) + ' projects</span>' +
+          '<button class="tn-grant" onclick="openGR(\'group\',\'' + gid + '\')">Grant</button></div></div>';
+        if (expanded.has(gnid)) {
+          h += '<div class="tchildren">';
+          g.orgs.forEach(oid => {
+            const onid = "org:" + oid;
+            h += '<div class="tnode-row">' + caret(onid, true) +
+              '<span class="tn-icon">&#128188;</span><span class="tn-name">' + ORGS[oid].name + '</span>' +
+              '<span class="tn-kind org">Org</span>' + grantChips(ORG_GRANTS[oid]) +
+              '<div class="tn-right"><span class="tn-meta">' + projectsUnderOrg(oid) + ' projects</span>' +
+              '<button class="tn-grant" onclick="openGR(\'org\',\'' + oid + '\')">Grant</button></div></div>';
+            if (expanded.has(onid)) {
+              h += '<div class="tchildren">';
+              PROJECTS.filter(p => p.orgs[0] === oid).forEach(p => {
+                const vs = effectiveViewers(p);
+                const also = p.orgs.length > 1 ? ' <span class="via">(also in ' + ORGS[p.orgs[1]].name + ')</span>' : '';
+                h += '<div class="tproj"><span class="tn-caret leaf"></span>' +
+                  '<span class="tn-icon">&#128196;</span><span class="tp-name">' + p.name + '</span>' + also +
+                  '<span class="tp-viewers">' + avstack(vs.map(v => v.id)) +
+                  '<span class="via">via <b>' + [...new Set(vs.map(v => v.src))].slice(0, 2).join(", ") + '</b></span></span></div>';
+              });
+              h += '</div>';
+            }
+          });
+          h += '</div>';
+        }
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+    document.getElementById("content").innerHTML = h;
+  }
+  function toggleNode(nid) { if (expanded.has(nid)) expanded.delete(nid); else expanded.add(nid); renderB(); }
+
+  // Grant modal
+  let grTarget = null; // {type, key}
+  let grSel = new Set();
+  function grGetArr(t) {
+    if (t.type === "acct") return ACCOUNT_GRANTS;
+    if (t.type === "group") return GROUPS_B[t.key].grants;
+    return ORG_GRANTS[t.key];
+  }
+  function grName(t) {
+    if (t.type === "acct") return "Northwind Energy (Account)";
+    if (t.type === "group") return GROUPS_B[t.key].name + " (Org Group)";
+    return ORGS[t.key].name + " (Org)";
+  }
+  function openGR(type, key) {
+    grTarget = { type, key };
+    grSel = new Set(grGetArr(grTarget));
+    document.getElementById("gr-title").textContent = "Grant access";
+    document.getElementById("gr-sub").textContent = grName(grTarget);
+    const scope = type === "acct" ? "every project in the account"
+      : type === "group" ? "every project in every org under " + GROUPS_B[key].name
+      : "every project in " + ORGS[key].name;
+    document.getElementById("gr-helper").innerHTML = "People granted here can see <b>" + scope + "</b>. Access cascades down the tree.";
+    window.__activeScreen = "B · Grant — " + grName(grTarget);
+    document.getElementById("gr-people").innerHTML = PEOPLE_ORDER.map(id =>
+      '<span class="ppl ' + (grSel.has(id) ? "on" : "") + '" onclick="toggleGR(\'' + id + '\',this)">' +
+      av(id) + PEOPLE[id].name + ' <span class="ppl-role">' + PEOPLE[id].role + '</span></span>').join("");
+    document.getElementById("gr-scrim").classList.add("open");
+  }
+  function toggleGR(id, el) { if (grSel.has(id)) grSel.delete(id); else grSel.add(id); el.classList.toggle("on"); }
+  function saveGR() {
+    const arr = grGetArr(grTarget);
+    arr.length = 0;
+    PEOPLE_ORDER.filter(id => grSel.has(id)).forEach(id => arr.push(id));
+    closeGR(); renderB();
+  }
+  function closeGR() { document.getElementById("gr-scrim").classList.remove("open"); }
+
+  // ===== Variant C — attribute rules =====
+  function ruleSentence(scope) {
+    const restr = ATTR_FIELDS.filter(f => scope[f.key].length);
+    if (!restr.length) return "<b>every project</b> in the account.";
+    return "projects where " + restr.map(f => f.name + " is <b>" + scope[f.key].join(" or ") + "</b>").join(", and ") + ".";
+  }
+  function ruleCount(scope) { return PROJECTS.filter(p => ruleMatches(scope, p)).length; }
+  function renderC() {
+    let h = projectsHead(
+      '<div class="variant-cap"><span class="vc-tag">C · Attribute rules</span><span class="vc-body">' +
+      'Access is defined as <b>rules over project attributes</b> (Region, Division, Customer, Project Type — the same ' +
+      'fields as member access scope, applied account-wide). Projects <b>match rules automatically</b> as they’re ' +
+      'created; nobody hand-picks projects. Self-maintaining, but only as good as the tagging.</span></div>');
+
+    h += '<div class="page-actions"><button class="btn btn-primary btn-sm" onclick="openRU(-1)">+ New access rule</button>' +
+      '<span style="font-size:12px;color:#888c90;">' + RULES.length + ' rules · ' + PROJECTS.length + ' projects in the account</span></div>';
+
+    h += '<div class="rules-wrap">';
+    RULES.forEach((r, i) => {
+      const n = ruleCount(r.scope);
+      h += '<div class="rule-card">' +
+        '<div class="rc-head"><span class="rc-subject">' + r.subject + '</span>' +
+        '<span class="rc-count">' + n + ' project' + (n === 1 ? "" : "s") + '</span>' +
+        '<div class="rc-right"><button class="rc-mini" onclick="toggleMatches(' + i + ')">Show projects</button>' +
+        '<button class="rc-mini" onclick="openRU(' + i + ')">Edit</button></div></div>' +
+        '<div class="rc-sentence">Can see ' + ruleSentence(r.scope) + '</div>' +
+        '<div class="rc-matches" id="rm-' + i + '"><div class="rm-title">Matching projects</div>' +
+        PROJECTS.filter(p => ruleMatches(r.scope, p)).map(p =>
+          '<div class="rc-match"><span class="tn-icon">&#128196;</span>' + p.name +
+          '<span class="rm-org">· ' + p.orgs.map(o => ORGS[o].name).join(" + ") + '</span>' +
+          '<span style="margin-left:auto;">' + attrChips(p) + '</span></div>').join("") +
+        '</div></div>';
+    });
+    h += '</div>';
+    document.getElementById("content").innerHTML = h;
+  }
+  function toggleMatches(i) { document.getElementById("rm-" + i).classList.toggle("open"); }
+
+  // Rule builder modal
+  let ruIdx = -1;
+  let ruScope = blankScope();
+  function openRU(i) {
+    ruIdx = i;
+    const subjSel = document.getElementById("ru-subject");
+    subjSel.innerHTML = SUBJECTS.map(s => '<option>' + s + '</option>').join("");
+    if (i >= 0) { ruScope = JSON.parse(JSON.stringify(RULES[i].scope)); subjSel.value = RULES[i].subject; }
+    else { ruScope = blankScope(); subjSel.selectedIndex = 0; }
+    document.getElementById("ru-title").textContent = i >= 0 ? "Edit access rule" : "New access rule";
+    document.getElementById("ru-del").style.visibility = i >= 0 ? "visible" : "hidden";
+    window.__activeScreen = "C · Rule builder";
+    buildRUfields();
+    updateRUsummary();
+    document.getElementById("ru-scrim").classList.add("open");
+  }
+  function buildRUfields() {
+    document.getElementById("ru-fields").innerHTML = ATTR_FIELDS.map(f => {
+      const sel = ruScope[f.key], anyOn = !sel.length;
+      let opts = '<span class="opt all-toggle ' + (anyOn ? "on" : "") + '" data-field="' + f.key + '" data-any="1">Any</span>';
+      opts += f.values.map(v =>
+        '<span class="opt ' + (f.geo ? "geo" : "") + ' ' + (sel.includes(v) ? "on" : "") + '" data-field="' + f.key + '" data-val="' + v.replace(/"/g, "&quot;") + '">' + v + '</span>').join("");
+      return '<div class="ed-field"><div class="ed-field-head"><span class="ed-field-name">' + f.name + '</span>' +
+        (f.geo ? '<span class="ed-field-mini">&#9672; drawn on map</span>' : '<span class="ed-field-mini">value list</span>') +
+        '</div><div class="opts">' + opts + '</div></div>';
+    }).join("");
+    document.querySelectorAll("#ru-fields .opt").forEach(o => o.onclick = onRUopt);
+  }
+  function onRUopt(e) {
+    const el = e.currentTarget, field = el.dataset.field;
+    if (el.dataset.any) { ruScope[field] = []; }
+    else { const v = el.dataset.val, arr = ruScope[field]; const k = arr.indexOf(v); if (k >= 0) arr.splice(k, 1); else arr.push(v); }
+    const sel = ruScope[field], anyOn = !sel.length;
+    el.closest(".ed-field").querySelectorAll(".opt").forEach(o => {
+      if (o.dataset.any) o.classList.toggle("on", anyOn);
+      else o.classList.toggle("on", !anyOn && sel.includes(o.dataset.val));
+    });
+    updateRUsummary();
+  }
+  function updateRUsummary() {
+    document.getElementById("ru-sentence").innerHTML = ruleSentence(ruScope);
+    const n = ruleCount(ruScope);
+    document.getElementById("ru-count").textContent = "→ " + n + " of " + PROJECTS.length + " projects match right now";
+  }
+  function saveRU() {
+    const subject = document.getElementById("ru-subject").value;
+    const scope = JSON.parse(JSON.stringify(ruScope));
+    if (ruIdx >= 0) RULES[ruIdx] = { subject, scope };
+    else RULES.push({ subject, scope });
+    closeRU(); renderC();
+  }
+  function deleteRU() { if (ruIdx >= 0) RULES.splice(ruIdx, 1); closeRU(); renderC(); }
+  function closeRU() { document.getElementById("ru-scrim").classList.remove("open"); }
+
+  // ===== Overview / People / Orgs =====
+  function renderOverview() {
+    let h = '<div class="page-head"><div class="page-h">Overview</div></div>' +
+      '<div class="stat-row">' +
+      '<div class="stat-card"><div class="sc-num">4</div><div class="sc-lbl">Orgs</div></div>' +
+      '<div class="stat-card"><div class="sc-num">' + PROJECTS.length + '</div><div class="sc-lbl">Projects</div></div>' +
+      '<div class="stat-card"><div class="sc-num">' + PEOPLE_ORDER.length + '</div><div class="sc-lbl">People</div></div>' +
+      '<div class="stat-card"><div class="sc-num">3</div><div class="sc-lbl">Org groups</div></div></div>';
+    h += '<div class="note-box"><b>Why the Account view exists.</b> Today an economic buyer at a multi-org customer has no single ' +
+      'place to see aggregate usage and project activity — CivilGrid staff pull it from each org by hand. The Account rolls up ' +
+      'every org under one entity. <b>Projects &amp; Access</b> is where that rollup becomes actionable — use the A / B / C toggle ' +
+      'in the Prototype bar to compare how access to all these projects could be structured.</div>';
+    h += '<div style="height:22px;"></div><table class="grid"><thead><tr><th class="col-proj">Org</th><th>Org group</th><th>Projects</th></tr></thead><tbody>';
+    ORG_ORDER.forEach(oid => {
+      h += '<tr><td class="col-proj">' + ORGS[oid].name + '</td><td><span class="org-chip">' + GROUPS_B[ORGS[oid].group].name + '</span></td>' +
+        '<td>' + PROJECTS.filter(p => p.orgs.includes(oid)).length + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    document.getElementById("content").innerHTML = h;
+  }
+  function renderPeople() {
+    let h = '<div class="page-head"><div class="page-h">People</div></div>' +
+      '<div class="helper" style="max-width:760px;">Everyone with a seat somewhere under the Northwind Energy account. Access to specific projects is set on the <b>Projects &amp; Access</b> tab.</div>' +
+      '<table class="grid"><thead><tr><th class="col-proj">Name</th><th>Email</th><th>Role</th></tr></thead><tbody>';
+    PEOPLE_ORDER.forEach(id => {
+      h += '<tr><td class="col-proj"><span class="avstack" style="margin-right:8px;">' + av(id) + '</span>' + PEOPLE[id].name + '</td>' +
+        '<td style="color:#54585b;">' + PEOPLE[id].email + '</td><td><span class="org-chip">' + PEOPLE[id].role + '</span></td></tr>';
+    });
+    h += '</tbody></table>';
+    document.getElementById("content").innerHTML = h;
+  }
+  function renderOrgs() {
+    let h = '<div class="page-head"><div class="page-h">Orgs</div></div>' +
+      '<div class="helper" style="max-width:760px;">The four orgs that make up this account. In production these are the separate CivilGrid orgs a customer accumulated — the Account is the new parent that ties them together.</div>' +
+      '<table class="grid"><thead><tr><th class="col-proj">Org</th><th>Org group</th><th>Projects</th></tr></thead><tbody>';
+    ORG_ORDER.forEach(oid => {
+      h += '<tr><td class="col-proj">' + ORGS[oid].name + '</td><td><span class="org-chip">' + GROUPS_B[ORGS[oid].group].name + '</span></td>' +
+        '<td>' + PROJECTS.filter(p => p.orgs.includes(oid)).length + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    document.getElementById("content").innerHTML = h;
+  }
+
+  // ===== Profile menu / entry point =====
+  function toggleProfile(e) {
+    e.stopPropagation();
+    document.getElementById("profile-menu").classList.toggle("open");
+  }
+  function gotoAccount() {
+    document.getElementById("profile-menu").classList.remove("open");
+    switchNav("projects");
+  }
+  document.addEventListener("click", () => document.getElementById("profile-menu").classList.remove("open"));
+
+  // ===== Info panel =====
+  function toggleInfo() {
+    const ip = document.getElementById('info-panel');
+    const willOpen = !ip.classList.contains('open');
+    ip.classList.toggle('open');
+    if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+  }
+
+  // ===== Feedback widget =====
+  const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+  const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+  const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+  const PROTOTYPE_SLUG = FILE_NAME.replace(/\.html?$/i, "").replace(/-b\d{3,}$/i, "");
+  const PROTOTYPE_NAME = PROTOTYPE_SLUG.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  window.__activeScreen = window.__activeScreen || PROTOTYPE_NAME;
+
+  function fbUrl(embedded) {
+    const u = new URL(FEEDBACK_FORM_BASE);
+    if (embedded) u.searchParams.set("embedded", "true");
+    u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+    u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+    u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+    return u.toString();
+  }
+  function fbOpen() {
+    document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+    document.getElementById('fb-frame').src = fbUrl(true);
+    document.getElementById('fb-newtab').href = fbUrl(false);
+    document.getElementById('info-panel').classList.remove('open');
+    document.getElementById('fb-pane').classList.add('open');
+  }
+  function fbClose() { document.getElementById('fb-pane').classList.remove('open'); }
+  document.getElementById('fb-open').onclick = fbOpen;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { fbClose(); closeMA(); closeGR(); closeRU(); document.getElementById("profile-menu").classList.remove("open"); } });
+
+  // ===== init =====
+  setScreen();
+  render();
+</script>
+</body>
+</html>
