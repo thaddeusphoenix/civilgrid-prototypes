@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  BUILD b023 · Jul 15, 2026
+  Build history (newest first):
+    b023 · Jul 15, 2026 — Added a "Linear project" link (Admin Panel - Customize Organization Project Tier Subscription w/ Features) to the About panel.
+    b022 · Jun 22, 2026 — build stamp restyled as plain muted text (dropped pill background + border) so it
+      no longer reads as a button.
+    b021 · Jun 19, 2026 — removed the Tier Defaults view + the segmented switcher entirely. Defaults are now
+      assumed (still the invisible baseline overrides are diffed against); the Feature Provisioning tab
+      shows the per-org matrix directly. Dropped renderMatrix/switchView/activeProvScreen and the orphaned
+      .seg/.lockbar/.tgl.locked CSS.
+    b020 · Jun 19, 2026 — removed the "On differs from the tier default" legend under the Custom Settings
+      grid; the override model + count are already called out in the header/lead-in.
+    b019 · Jun 19, 2026 — enlarged the "PROTOTYPE" label (15px / 800 weight) so it grabs more attention.
+    b018 · Jun 19, 2026 — Build history in the About panel collapsed into an expandable <details> section
+      (matches the "If we build this" section); keeps the panel short by default.
+    b017 · Jun 19, 2026 — description text is no longer clickable (plain label); the "About" button is the
+      sole trigger for the info panel.
+    b016 · Jun 19, 2026 — Feedback button relabeled "Give Feedback Here"; added an "About" button beside it
+      (the info-panel trigger); feedback form now opens in a right-hand pane (like the info panel) instead
+      of a centered modal. The two right panes are mutually exclusive (opening one closes the other).
+    b015 · Jun 19, 2026 — prototype bar restyle: "PROTOTYPE" is now plain orange text pinned far-left
+      (no pill/button look); center group order flipped to Description → Build; Feedback stays far-right.
+    b014 · Jun 19, 2026 — added a collapsible "If we build this — Linear issues" section at the bottom of
+      the info panel (grouped issue titles: foundation / super-admin / custom settings / enforcement /
+      decisions). New standing convention for all prototypes (see skills/paper-prototype.md). Info panel
+      now scrolls if it outgrows the viewport.
+    b013 · Jun 19, 2026 — clarified the override model (design feedback). Renamed the "This Organization"
+      segment to "Custom Settings"; added a lead-in stating every org runs on locked Tier Defaults and
+      Custom Settings overrides only what's needed; added a live override count and floated Save above the
+      grid (right-aligned) so it pops on view-switch; fixed stale "change its tier" copy.
+    b012 · Jun 19, 2026 — removed the gray tier descriptor pill (new/entry/core/full) from both the
+      Tier Defaults and org headers; tier name now sits directly above the controls.
+    b011 · Jun 19, 2026 — replaced per-org tier RENAME with a per-org tier DESCRIPTION. Tier names are
+      canonical product objects and stay fixed; the description is a per-org blurb (meant to surface to
+      the org's users in-app later) captured here via "+ Add description" under each tier.
+    b010 · Jun 18, 2026 — Feedback button pulses brand orange (~1.6s) to draw attention; pauses on hover,
+      respects prefers-reduced-motion.
+    b009 · Jun 18, 2026 — feedback mapping: Build field now carries the full filename (name + build number,
+      the exact-file pointer); Prototype field stays the friendly description. Both auto-derived.
+    b008 · Jun 18, 2026 — feedback now stamps the Prototype field with the filename slug (auto-derived from
+      the filename); slug + Build = the exact file. No per-prototype name to set.
+    b007 · Jun 18, 2026 — feedback widget now submits to a live Google Form, prefilling prototype / build /
+      screen via entry IDs. Replaces the unprovisioned Notion form.
+    b006 · Jun 18, 2026 — org-level tier rename: click a tier name (✎) to alias it for the org; canonical
+      name shown beneath when renamed. Canonical names stay locked under Tier Defaults.
+    b005 · Jun 18, 2026 — added a per-tier master switch in the org view: turn a whole project tier on/off
+      for the org. Disabled tiers grey out and their feature cells go inert.
+    b004 · Jun 17, 2026 — Tier Defaults shown as locked (super-admin only): lock bar, lock glyph on the
+      segment, non-interactive cells, disabled edit button. Org cells that differ from the locked tier
+      default now flag light yellow.
+    b003 · Jun 17, 2026 — removed the Acme tier banner; "This Organization" now renders the full
+      features × tiers matrix (its own data, a customer-driven scenario baked into the Project Light column).
+    b002 · Jun 17, 2026 — removed the per-tier/override explainer paragraph; simplified "This Organization"
+      to match the Tier Defaults view (plain feature + On/Off toggle; dropped tier-default chip, status, override chips, reset).
+    b001 · Jun 17, 2026 — initial build: Feature Provisioning tab on Update Organization Subscription.
+      Tier Defaults matrix (features × Draft/Light/Standard/Plus) + per-org override view (Acme, example override scenario).
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feature Provisioning — Org Subscription</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Noto Sans", system-ui, -apple-system, sans-serif;
+    background: #f4f5f5;
+    color: #1d1e20;
+    padding-top: 32px;
+    font-size: 14px;
+  }
+
+  /* ===== Prototype bar ===== */
+  .proto-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    height: 32px; background: #243442;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 16px; gap: 10px; user-select: none;
+  }
+  .proto-badge {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    background: none; padding: 0; color: #f27e31;
+    font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .proto-build {
+    flex-shrink: 0; color: rgba(255,255,255,0.5);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.4px;
+  }
+  .proto-desc {
+    font-size: 12px; color: rgba(255,255,255,0.65);
+    white-space: nowrap; padding: 2px 6px;
+  }
+  .proto-actions {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .proto-about-btn {
+    border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s;
+  }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn {
+    border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s;
+    animation: fbPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes fbPulse {
+    0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); }
+    50%      { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); }
+  }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+  .info-panel {
+    display: none; position: fixed; top: 32px; right: 0;
+    width: 340px; background: #ffffff;
+    border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px;
+    padding: 16px; z-index: 199;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    font-size: 13px; color: #393b3d; line-height: 1.5;
+    max-height: calc(100vh - 40px); overflow-y: auto;
+  }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  /* collapsible "if we build this" Linear breakdown — bottom of the panel */
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  /* ===== Top nav ===== */
+  .top-nav {
+    position: sticky; top: 32px; z-index: 100;
+    height: 56px; background: #fff;
+    border-bottom: 1px solid #d2d4d7;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+  }
+  .nav-left { display: flex; align-items: center; gap: 16px; }
+  .wordmark { color: #f27e31; font-weight: 800; letter-spacing: 1px; font-size: 20px; }
+  .nav-admin { font-size: 14px; color: #393b3d; display: flex; align-items: center; gap: 4px; }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .nav-icon { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #babdc0; color: #6e7376; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .nav-badge { position: relative; }
+  .nav-badge::after { content: "9+"; position: absolute; top: -6px; right: -8px; background: #d61e17; color: #fff; font-size: 9px; font-weight: 700; border-radius: 8px; padding: 1px 4px; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: #243442; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+
+  /* ===== Layout ===== */
+  .layout { display: flex; min-height: calc(100vh - 88px); }
+
+  /* Left nav */
+  .left-nav { width: 224px; flex-shrink: 0; border-right: 1px solid #d2d4d7; background: #fff; padding: 8px; }
+  .home-link { display: flex; align-items: center; gap: 4px; color: #196fe0; font-size: 14px; padding: 4px 8px; margin: 8px 0; cursor: pointer; }
+  .home-link:hover span:last-child { border-bottom: 1px solid #196fe0; }
+  .nav-section { margin-bottom: 8px; }
+  .nav-section-title { font-size: 16px; font-weight: 500; color: #656e75; padding: 4px 4px; margin-bottom: 2px; }
+  .nav-item { font-size: 14px; color: #1d1e20; padding: 4px 8px; border-radius: 2px; cursor: pointer; }
+  .nav-item:hover { background: #e9eaeb; }
+  .nav-item.active { background: #eaf5ff; color: #134a91; font-weight: 500; }
+  .nav-divider { height: 1px; background: #d2d4d7; margin: 8px 0; }
+
+  /* Content */
+  .content { flex: 1; overflow: auto; padding: 24px 28px 80px; max-width: 1180px; }
+  .page-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; }
+  .field-label { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+
+  /* Org selector */
+  .org-select {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 16px; color: #1d1e20; cursor: pointer;
+  }
+  .org-select .chev { color: #888c90; font-size: 12px; }
+  .org-select-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 20px; }
+  .org-select-row .lbl { font-size: 16px; color: #54585b; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid #d2d4d7; margin-bottom: 24px; }
+  .tab {
+    font-size: 14px; font-weight: 500; color: #54585b;
+    padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; transition: all 0.1s;
+  }
+  .tab:hover { color: #1d1e20; }
+  .tab.active { color: #134a91; border-bottom-color: #196fe0; }
+
+  /* Pricing stub */
+  .pricing-stub {
+    display: none; background: #fff; border: 1px solid #e9eaeb; border-radius: 8px;
+    padding: 40px; text-align: center; color: #888c90; font-size: 14px;
+  }
+  .pricing-stub.show { display: block; }
+
+  /* Provisioning panel */
+  .prov { display: none; }
+  .prov.show { display: block; }
+
+  .prov-header { margin-bottom: 16px; }
+  .prov-sub { font-size: 13px; color: #54585b; line-height: 1.5; max-width: 760px; }
+
+  /* toggle pill — CivilGrid Toggle, outline variant */
+  .tgl {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 12px; font-weight: 500; line-height: 20px;
+    border-radius: 6px; padding: 4px 10px; cursor: pointer;
+    border: 1px solid #d2d4d7; background: #f4f5f5; color: #1f2c38;
+    transition: all 0.08s; min-width: 64px;
+  }
+  .tgl:hover { background: #e9eaeb; }
+  .tgl.on { background: #eaf5ff; border-color: #196fe0; color: #134a91; }
+  .tgl .dot { width: 6px; height: 6px; border-radius: 50%; background: #888c90; }
+  .tgl.on .dot { background: #196fe0; }
+  /* org cell that differs from the tier default — light yellow flag */
+  .tgl.diff { background: #fffbef; border-color: #f2bc46; color: #db9c13; }
+  .tgl.diff:hover { background: #ffefbb; }
+  .tgl.diff .dot { background: #db9c13; }
+
+  /* tier description (org view) — per-org blurb shown to the org's users in-app;
+     the tier name itself stays fixed (canonical product object) */
+  .tier-edit { font-size: 10px; color: #888c90; cursor: pointer; opacity: 0; transition: opacity 0.1s; }
+  th:hover .tier-edit { opacity: 0.7; }
+  .tier-edit:hover { color: #196fe0; opacity: 1; }
+  .tier-descwrap { display: inline-flex; align-items: flex-start; gap: 4px; max-width: 152px; }
+  .tier-desc-text { font-size: 11px; font-weight: 400; font-style: italic; color: #54585b; line-height: 1.35; text-align: center; cursor: pointer; }
+  .tier-desc-text:hover { color: #196fe0; }
+  .tier-desc-add { font-size: 11px; color: #196fe0; cursor: pointer; opacity: 0.7; transition: opacity 0.1s; }
+  .tier-desc-add:hover { opacity: 1; text-decoration: underline; }
+  th:hover .tier-desc-add { opacity: 1; }
+  .tier-desc-input { font-size: 11px; color: #1d1e20; border: 1px solid #196fe0; border-radius: 4px; padding: 4px 6px; width: 152px; font-family: inherit; line-height: 1.35; outline: none; resize: vertical; text-align: left; }
+
+  /* tier master switch (org view) — enable/disable a whole tier for the org */
+  .tier-master { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: #888c90; font-weight: 500; margin-top: 4px; user-select: none; }
+  .tm-track { width: 28px; height: 16px; border-radius: 9999px; background: #d2d4d7; position: relative; transition: background 0.1s; flex-shrink: 0; }
+  .tm-knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: left 0.1s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .tier-master.on .tm-track { background: #196fe0; }
+  .tier-master.on .tm-knob { left: 14px; }
+  .tier-master.on .tm-label { color: #134a91; }
+  .tier-master:not(.on) .tm-label { color: #888c90; }
+  /* disabled tier column */
+  th.tier-disabled .tier-name { color: #babdc0; }
+  th.tier-disabled .tier-pill { color: #babdc0; }
+  td.col-disabled { background: #fafafb !important; }
+  .tgl.cell-disabled { opacity: 0.32; cursor: not-allowed; }
+  .tgl.cell-disabled:hover { background: #f4f5f5; }
+  .tgl.on.cell-disabled:hover { background: #eaf5ff; }
+
+  /* Matrix table */
+  .matrix { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; overflow: hidden; }
+  .matrix th, .matrix td { padding: 12px 16px; text-align: left; font-size: 13px; border-bottom: 1px solid #e9eaeb; }
+  .matrix thead th { background: #fff; font-weight: 500; color: #54585b; font-size: 12px; border-bottom: 1px solid #d2d4d7; }
+  .matrix thead th.tier-col { text-align: center; }
+  .matrix tbody tr:last-child td { border-bottom: none; }
+  .matrix tbody tr:nth-child(even) td { background: #fbfbfc; }
+  .matrix td.tier-col { text-align: center; }
+  .feat-name { font-weight: 500; color: #1d1e20; }
+  .feat-desc { font-size: 11px; color: #888c90; margin-top: 2px; }
+  .tier-head { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .tier-name { font-weight: 600; color: #1d1e20; font-size: 13px; }
+  .tier-pill { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: #888c90; }
+  th.tier-col.draft-col .tier-name { color: #da712c; }
+
+  /* Org view table */
+  .orgbanner {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    background: #fff; border: 1px solid #d2d4d7; border-radius: 8px;
+    padding: 14px 18px; margin-bottom: 18px;
+  }
+  .orgbanner .org-name { font-weight: 600; font-size: 15px; }
+  .orgbanner .muted { color: #54585b; font-size: 13px; }
+  .tier-radio { display: inline-flex; border: 1px solid #d2d4d7; border-radius: 6px; overflow: hidden; }
+  .tier-radio .ti { font-size: 12px; font-weight: 500; color: #393b3d; padding: 5px 12px; cursor: pointer; border-right: 1px solid #d2d4d7; background: #fff; }
+  .tier-radio .ti:last-child { border-right: none; }
+  .tier-radio .ti:hover { background: #f4f5f5; }
+  .tier-radio .ti.active { background: #243442; color: #fff; }
+
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 9999px; }
+  .chip.default { background: #e9eaeb; color: #54585b; }
+  .chip.on { background: #c8f5d2; color: #0b7a09; }
+  .chip.off { background: #f4f5f5; color: #888c90; border: 1px solid #e9eaeb; }
+  .chip.override { background: #ffefbb; color: #db9c13; border: 1px solid #f2bc46; }
+
+  .reset-link { font-size: 12px; color: #196fe0; cursor: pointer; margin-left: 8px; }
+  .reset-link:hover { text-decoration: underline; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: #54585b; align-items: center; }
+  .legend .sw { display: inline-flex; align-items: center; gap: 6px; }
+
+  .save-row { margin-top: 22px; display: flex; gap: 10px; align-items: center; }
+  .btn { font-size: 14px; font-weight: 500; padding: 7px 16px; border-radius: 4px; cursor: pointer; border: 1px solid transparent; }
+  .btn-primary { background: #243442; color: #fff; }
+  .btn-primary:hover { background: #1f2c38; }
+  .btn-hollow { background: #fff; color: #393b3d; border-color: #d2d4d7; }
+  .btn-hollow:hover { background: #f4f5f5; }
+  .dirty-note { font-size: 12px; color: #db9c13; }
+
+  /* Custom Settings (org) view — lead-in + action bar above the grid */
+  .org-intro {
+    background: #eaf5ff; border: 1px solid #cfe4fb; border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 14px;
+    font-size: 12px; color: #134a91; line-height: 1.5;
+  }
+  .org-intro b { font-weight: 600; }
+  .org-intro .amber { color: #db9c13; }
+  .org-intro .ops { display: block; margin-top: 6px; color: #2a5da8; }
+  .org-actionbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 12px;
+  }
+  .override-summary { font-size: 12px; color: #54585b; }
+  .override-summary b { color: #db9c13; font-weight: 600; }
+  .override-summary.none { color: #888c90; }
+  .save-cluster { display: flex; align-items: center; gap: 10px; }
+
+  /* feedback — right-hand pane (matches the info panel placement) */
+  .fb-pane {
+    display: none; position: fixed; top: 32px; right: 0; bottom: 0;
+    width: 440px; max-width: 92vw; background: #fff;
+    border-left: 1px solid #d2d4d7;
+    box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199;
+    flex-direction: column; overflow: hidden;
+  }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Feature Provisioning — Org Subscription</span>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Feature Provisioning — Org Subscription</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>Pressure-test which features should be toggleable per project tier — and how a per-org override unblocks a real customer case (downloads + potholing without CivilSearch). From a June grooming call.</p></div>
+  <div class="info-panel-section"><strong>Linear project</strong><p><a href="https://linear.app/civilgrid/project/admin-panel-customize-organization-project-tier-subscription-w-8bc239bda2f4" target="_blank" rel="noopener" style="color:#196fe0;text-decoration:none;font-weight:600;">Admin Panel - Customize Organization Project Tier Subscription w/ Features &#8599;</a></p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li>Features × tiers (Draft / Project Light / Standard / Plus) for this org. Tier defaults are <i>assumed</i> — they're not a separate view; this screen only edits what this org overrides.</li>
+    <li>Acme runs on tier defaults with a few overrides baked in (downloads + potholing on, CivilSearch off in Project Light). A lead-in states the override model; an override count + Save sit above the grid.</li>
+    <li>Overridden cells flag amber and the count updates live; everything else keeps following the default.</li>
+    <li><b>Per-org tier description</b> — under each tier, "+ Add description" sets a blurb for this org (meant to surface to the org's users in-app). The tier <i>name</i> stays fixed — it's a canonical product object, not renamed per org.</li>
+  </ul></div>
+  <div class="info-panel-section"><strong>Not real yet</strong><p>Tier defaults shown are a first guess — that's the open question for product &amp; engineering. No save/persistence. The Feedback button submits to a live Google Form (stamped with prototype + build + screen).</p></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b023</b> — Added Linear project link to About panel</li><li><b>b022</b> — build stamp restyled as plain muted text so it no longer looks like a button</li><li><b>b021</b> — removed the Tier Defaults view + segmented switcher; defaults are now assumed and the tab shows the per-org matrix directly</li><li><b>b020</b> — removed the redundant "differs from tier default" legend under the Custom Settings grid</li><li><b>b019</b> — enlarged the "PROTOTYPE" label so it grabs more attention</li><li><b>b018</b> — Build history collapsed into an expandable section</li><li><b>b017</b> — description is now plain text; "About" is the sole info-panel trigger</li><li><b>b016</b> — "Give Feedback Here" + new "About" button; feedback opens in a right-hand pane (not a modal)</li><li><b>b015</b> — prototype bar restyle: orange "PROTOTYPE" label far-left, center order flipped to description → build</li><li><b>b014</b> — added collapsible "If we build this — Linear issues" section at the bottom</li><li><b>b013</b> — clarified override model: "This Organization" → "Custom Settings", added lead-in + live override count, floated Save above the grid</li><li><b>b012</b> — removed the gray tier descriptor pill from both headers</li><li><b>b011</b> — per-org tier <i>description</i> replaces per-org rename; tier names stay canonical</li><li><b>b010</b> — Feedback button pulses orange to draw attention</li><li><b>b009</b> — feedback: Build field = full filename (exact-file pointer); Prototype = friendly description</li><li><b>b008</b> — feedback stamps the filename slug as Prototype (slug + build = exact file)</li><li><b>b007</b> — feedback widget submits to a live Google Form (prefilled prototype/build/screen)</li><li><b>b006</b> — org-level tier rename (alias a tier per org; canonical name stays locked)</li><li><b>b005</b> — per-tier master switch in org view (turn a whole tier on/off for the org)</li><li><b>b004</b> — Tier Defaults locked (super-admin only); org cells flag yellow when they differ from default</li><li><b>b003</b> — removed tier banner; "This Organization" is now the full tier matrix</li><li><b>b002</b> — simplified "This Organization" to match Tier Defaults; removed explainer</li><li><b>b001</b> — initial build</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Add tier-default feature matrix as a locked, super-admin baseline</li>
+      <li>Add per-org feature override store (org × feature × tier)</li>
+      <li>Add per-org tier enable/disable flag</li>
+      <li>Add per-org tier description field</li>
+      <li>Define override resolution (org value falls through to tier default)</li>
+    </ul></div>
+    <div class="grp"><b>Super-admin: Tier Defaults</b><ul>
+      <li>Build Tier Defaults matrix view (read-only for non-super-admins)</li>
+      <li>Gate Tier Defaults editing to super-admin role</li>
+      <li>Add Tier Defaults edit + save</li>
+    </ul></div>
+    <div class="grp"><b>Admin: Custom Settings (per-org)</b><ul>
+      <li>Add Feature Provisioning tab to Update Organization Subscription</li>
+      <li>Build Custom Settings matrix with per-cell override</li>
+      <li>Flag overridden cells + show live override count</li>
+      <li>Add per-tier master enable/disable switch</li>
+      <li>Add reset-to-default for a single override</li>
+      <li>Add per-tier description editor</li>
+      <li>Persist + save Custom Settings (dirty state, confirmation)</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app</b><ul>
+      <li>Enforce resolved feature access across the app</li>
+      <li>Surface tier descriptions to end users in-app</li>
+      <li>Handle access changes for active sessions / in-flight projects</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Spike: enumerate canonical feature set + agree tier defaults <span class="note">(product/eng)</span></li>
+      <li>Decide post-save navigation (stay vs. return to defaults) <span class="note">(design)</span></li>
+      <li>Decide guardrails for free downloads + potholing overrides <span class="note">(from grooming)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<!-- Top nav -->
+<nav class="top-nav">
+  <div class="nav-left">
+    <span class="wordmark">CIVILGRID</span>
+    <span class="nav-admin">Admin <span style="font-size:10px;color:#888c90;">▾</span></span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-icon nav-badge">🔔</span>
+    <span class="nav-icon">?</span>
+    <span class="avatar">NS</span>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- Left nav -->
+  <aside class="left-nav">
+    <div class="home-link"><span>←</span><span>Home</span></div>
+    <div class="nav-section">
+      <div class="nav-section-title">Projects</div>
+      <div class="nav-item">Transactions</div>
+      <div class="nav-item">Move Project</div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">Organizations</div>
+      <div class="nav-item">Create Organization</div>
+      <div class="nav-item">Create Sandbox Org</div>
+      <div class="nav-item">Manage Project Billing</div>
+      <div class="nav-item active">Update Organization Subscription</div>
+      <div class="nav-item">Join Org</div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">Users</div>
+      <div class="nav-item">Unapproved Users</div>
+      <div class="nav-item">Pre-Approved Domains</div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">CivilSearch</div>
+      <div class="nav-item">Civil Searchers</div>
+      <div class="nav-item">Data Requests</div>
+      <div class="nav-item">Agencies</div>
+      <div class="nav-item">Projects</div>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <main class="content">
+    <h1 class="page-title">Update Organization Subscription</h1>
+
+    <div class="field-label">Select Organization</div>
+    <div class="org-select-row">
+      <span class="lbl">Organization:</span>
+      <span class="org-select">Acme, Inc. Organization <span class="chev">▾</span></span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab" id="tab-pricing" onclick="switchTab('pricing')">Pricing</div>
+      <div class="tab active" id="tab-prov" onclick="switchTab('prov')">Feature Provisioning</div>
+    </div>
+
+    <!-- Pricing stub -->
+    <div class="pricing-stub" id="panel-pricing">
+      The existing pricing form (Project Lite Pricing, Project Pricing, unit costs…) lives here — stubbed out in this prototype to keep the focus on Feature Provisioning.
+    </div>
+
+    <!-- Provisioning -->
+    <div class="prov show" id="panel-prov">
+      <div class="org-intro">
+        Every org runs on the standard tier defaults out of the box — you don't have to configure this for every org. Override only what this org needs below: anything you change applies to this org alone and is flagged <b class="amber">amber</b>, while everything else keeps following the default.
+        <span class="ops">Click any cell to flip a feature · use a tier's switch to turn the whole tier on/off · add a per-org description under a tier (it'll show to your users in-app). The tier name itself stays fixed.</span>
+      </div>
+      <div class="org-actionbar">
+        <span class="override-summary" id="override-summary"></span>
+        <div class="save-cluster">
+          <span class="dirty-note" id="dirty-org"></span>
+          <button class="btn btn-primary">Save</button>
+        </div>
+      </div>
+      <table class="matrix">
+        <thead id="org-head"></thead>
+        <tbody id="org-body"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Feedback modal -->
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+// ===== Build / version stamp =====
+const BUILD = 23;
+const BUILD_DATE = "Jul 15, 2026";
+const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+// ===== Data model =====
+const TIERS = ["draft", "light", "standard", "plus"];
+const TIER_LABELS = { draft: "Draft", light: "Project Light", standard: "Standard", plus: "Plus" };
+
+const FEATURES = [
+  { id: "layers",    name: "Utility Layer Access", desc: "Underground & jurisdictional map layers" },
+  { id: "downloads", name: "Digital Downloads",    desc: "Export layer data / shapefiles" },
+  { id: "fieldnotes",name: "Field Notes",          desc: "Capture & sync notes from the field" },
+  { id: "civilsearch",name: "CivilSearch",         desc: "Agency data request workflow" },
+  { id: "potholing", name: "Potholing",            desc: "Request & track potholing / locate" },
+  { id: "conflicts", name: "Conflict Summary",     desc: "Metadata viewer & conflict grid" },
+  { id: "intel",     name: "Intelligence Tab",     desc: "Moratoriums, permits, agency research" },
+  { id: "portfolio", name: "Portfolio Optimization",desc: "Multi-project optimization view" },
+];
+
+// code-driven defaults per tier (first-guess current state — the open question for product/eng)
+const defaults = {
+  layers:      { draft: false, light: true,  standard: true,  plus: true },
+  downloads:   { draft: false, light: false, standard: true,  plus: true },
+  fieldnotes:  { draft: false, light: false, standard: true,  plus: true },
+  civilsearch: { draft: false, light: true,  standard: true,  plus: true },
+  potholing:   { draft: false, light: false, standard: false, plus: true },
+  conflicts:   { draft: false, light: false, standard: true,  plus: true },
+  intel:       { draft: false, light: true,  standard: true,  plus: true },
+  portfolio:   { draft: false, light: false, standard: false, plus: true },
+};
+
+// Acme org — its own copy of the matrix, seeded from the tier defaults.
+// Example customer scenario baked into the Project Light column: downloads + potholing on, CivilSearch off.
+const orgMatrix = {};
+FEATURES.forEach(f => { orgMatrix[f.id] = { ...defaults[f.id] }; });
+orgMatrix.downloads.light = true;
+orgMatrix.potholing.light = true;
+orgMatrix.civilsearch.light = false;
+
+// which whole tiers this org has access to (master on/off per tier)
+const orgTierEnabled = { draft: true, light: true, standard: true, plus: true };
+
+// per-org tier descriptions — a blurb the org sets to explain a tier to ITS users (surfaces in-app later).
+// The tier NAME stays canonical/locked; this only annotates it, it doesn't redefine the tier.
+const orgTierDescriptions = { draft: "", light: "", standard: "", plus: "" };
+let editingDescTier = null; // tier id whose description is being edited, or null
+
+// ===== Render: per-org feature matrix =====
+// Tier defaults are assumed (not shown as their own view); they're the baseline this matrix
+// is diffed against, so overrides can flag amber and feed the override count.
+function escAttr(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function renderOrgHead() {
+  const head = document.getElementById("org-head");
+  let cells = `<th style="width:42%;">Feature</th>`;
+  TIERS.forEach(t => {
+    const en = orgTierEnabled[t];
+    const draftCls = t === "draft" ? "draft-col" : "";
+    const desc = orgTierDescriptions[t];
+    // tier name is FIXED — a canonical product object, not editable per org
+    const nameBlock = `<span class="tier-name">${TIER_LABELS[t]}</span>`;
+    // description: inline editor while editing; otherwise the text + edit pencil, or an "add" link
+    let descBlock;
+    if (editingDescTier === t) {
+      descBlock =
+        `<textarea class="tier-desc-input" id="desc-input" rows="2" ` +
+        `placeholder="Describe this tier for your users…" ` +
+        `onkeydown="onDescKey(event,'${t}')" onblur="commitDesc('${t}', this.value)">${escHtml(desc)}</textarea>`;
+    } else if (desc) {
+      descBlock =
+        `<span class="tier-descwrap">` +
+        `<span class="tier-desc-text" onclick="startDesc('${t}')" title="Edit description">${escHtml(desc)}</span>` +
+        `<span class="tier-edit" onclick="startDesc('${t}')" title="Edit description">✎</span>` +
+        `</span>`;
+    } else {
+      descBlock = `<span class="tier-desc-add" onclick="startDesc('${t}')">+ Add description</span>`;
+    }
+    cells +=
+      `<th class="tier-col ${draftCls} ${en ? "" : "tier-disabled"}">` +
+      `<div class="tier-head">` +
+      nameBlock +
+      descBlock +
+      `<span class="tier-master ${en ? "on" : ""}" onclick="toggleTier('${t}')" title="Turn this tier on/off for the org">` +
+      `<span class="tm-track"><span class="tm-knob"></span></span>` +
+      `<span class="tm-label">${en ? "Enabled" : "Disabled"}</span>` +
+      `</span></div></th>`;
+  });
+  head.innerHTML = `<tr>${cells}</tr>`;
+  if (editingDescTier) {
+    const inp = document.getElementById("desc-input");
+    if (inp) { inp.focus(); inp.select(); }
+  }
+}
+function startDesc(t) {
+  editingDescTier = t;
+  renderOrgHead();
+}
+function onDescKey(e, t) {
+  // Enter commits; Shift+Enter inserts a newline; Escape cancels
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.target.blur(); }
+  else if (e.key === "Escape") { editingDescTier = null; renderOrgHead(); }
+}
+function commitDesc(t, value) {
+  if (editingDescTier !== t) return; // already handled (e.g. Escape)
+  orgTierDescriptions[t] = value.trim();
+  editingDescTier = null;
+  renderOrgHead();
+  document.getElementById("dirty-org").textContent = "Unsaved changes";
+}
+function renderOrg() {
+  renderOrgHead();
+  const body = document.getElementById("org-body");
+  body.innerHTML = "";
+  FEATURES.forEach(f => {
+    const tr = document.createElement("tr");
+    let cells = `<td><div class="feat-name">${f.name}</div><div class="feat-desc">${f.desc}</div></td>`;
+    TIERS.forEach(t => {
+      const on = orgMatrix[f.id][t];
+      if (!orgTierEnabled[t]) {
+        // tier is fully off for the org — cells inert, no diff flag
+        cells += `<td class="tier-col col-disabled"><span class="tgl cell-disabled ${on ? "on" : ""}"><span class="dot"></span>${on ? "On" : "Off"}</span></td>`;
+      } else {
+        const diff = on !== defaults[f.id][t]; // flag cells that differ from the locked tier default
+        cells += `<td class="tier-col"><span class="tgl ${on ? "on" : ""} ${diff ? "diff" : ""}" onclick="toggleOrg('${f.id}','${t}')"><span class="dot"></span>${on ? "On" : "Off"}</span></td>`;
+      }
+    });
+    tr.innerHTML = cells;
+    body.appendChild(tr);
+  });
+  updateOrgSummary();
+}
+// count feature cells (in enabled tiers) that differ from the locked tier default
+function countOverrides() {
+  let n = 0;
+  FEATURES.forEach(f => TIERS.forEach(t => {
+    if (orgTierEnabled[t] && orgMatrix[f.id][t] !== defaults[f.id][t]) n++;
+  }));
+  return n;
+}
+function updateOrgSummary() {
+  const el = document.getElementById("override-summary");
+  if (!el) return;
+  const disabledTiers = TIERS.filter(t => !orgTierEnabled[t]).length;
+  const n = countOverrides();
+  if (n === 0 && disabledTiers === 0) {
+    el.className = "override-summary none";
+    el.textContent = "No overrides — this org is running entirely on Tier Defaults.";
+  } else {
+    el.className = "override-summary";
+    const parts = [];
+    if (n > 0) parts.push(`<b>${n}</b> feature${n === 1 ? "" : "s"} overridden`);
+    if (disabledTiers > 0) parts.push(`<b>${disabledTiers}</b> tier${disabledTiers === 1 ? "" : "s"} turned off`);
+    el.innerHTML = parts.join(" · ") + " for this org.";
+  }
+}
+function toggleTier(tier) {
+  orgTierEnabled[tier] = !orgTierEnabled[tier];
+  renderOrg();
+  document.getElementById("dirty-org").textContent = "Unsaved changes";
+}
+function toggleOrg(fid, tier) {
+  if (!orgTierEnabled[tier]) return; // can't edit features in a disabled tier
+  orgMatrix[fid][tier] = !orgMatrix[fid][tier];
+  renderOrg();
+  document.getElementById("dirty-org").textContent = "Unsaved changes";
+}
+
+// ===== Tab switching =====
+function switchTab(which) {
+  const isProv = which === "prov";
+  document.getElementById("tab-prov").classList.toggle("active", isProv);
+  document.getElementById("tab-pricing").classList.toggle("active", !isProv);
+  document.getElementById("panel-prov").classList.toggle("show", isProv);
+  document.getElementById("panel-pricing").classList.toggle("show", !isProv);
+  window.__activeScreen = isProv ? "Feature Provisioning" : "Pricing";
+}
+
+// ===== Info ("About") panel — right-hand pane, mutually exclusive with the feedback pane =====
+function toggleInfo() {
+  const ip = document.getElementById("info-panel");
+  const willOpen = !ip.classList.contains("open");
+  ip.classList.toggle("open");
+  if (willOpen) document.getElementById("fb-pane").classList.remove("open"); // don't stack the two right panes
+}
+
+// ===== Feedback widget — Google Form, prefilled with prototype / build / screen =====
+const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+// File identity is derived from the filename (full basename incl. build, e.g. feature-provisioning-tab-b008.html)
+// and goes in the Build field — it's the exact-file pointer and can't drift. Prototype stays a friendly description.
+const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+const PROTOTYPE_SLUG = FILE_NAME.replace(/\.html?$/i, "").replace(/-b\d{3,}$/i, "");
+const PROTOTYPE_NAME = PROTOTYPE_SLUG.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase()); // description for the Prototype field; edit for a richer one
+window.__activeScreen = window.__activeScreen || "Feature Provisioning";
+function fbUrl(embedded) {
+  const u = new URL(FEEDBACK_FORM_BASE);
+  if (embedded) u.searchParams.set("embedded", "true");
+  u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME); // friendly description
+  u.searchParams.set(FB_ENTRY.build, FILE_NAME);          // filename + build number — the exact file
+  u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+  return u.toString();
+}
+function fbOpen() {
+  document.getElementById("fb-ctx").textContent = PROTOTYPE_NAME + " / " + window.__activeScreen;
+  document.getElementById("fb-frame").src = fbUrl(true);  // lazy-load: only contact Google when opened
+  document.getElementById("fb-newtab").href = fbUrl(false);
+  document.getElementById("info-panel").classList.remove("open"); // don't stack the two right panes
+  document.getElementById("fb-pane").classList.add("open");
+}
+function fbClose() { document.getElementById("fb-pane").classList.remove("open"); }
+document.getElementById("fb-open").onclick = fbOpen;
+document.addEventListener("keydown", e => { if (e.key === "Escape") fbClose(); });
+
+// ===== Init =====
+renderOrg();
+</script>
+</body>
+</html>
