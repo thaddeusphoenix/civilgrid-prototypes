@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<!--
+  BUILD b012 · Jul 20, 2026
+  Combined A/B prototype — both layouts in one file, toggled from the Prototype bar.
+  Supersedes the two standalone files (contract-prebuy-usage-b001 = Layout A,
+  contract-prebuy-usage-variant-b-b001 = Layout B). Identical data across both layouts.
+  Build history (newest first):
+    b012 · Jul 20, 2026 — Layout A's monthly bar chart now spans the full contract term (Dec 2025 –
+                          Dec 2026, 13 months), not just the 6 months with usage so far. Dec '25
+                          (contract just started) and Jul–Dec '26 (haven't happened yet) render as
+                          empty columns with real x-axis labels, instead of being omitted — the chart
+                          now reads as "the whole term," with a visibly partial fill, not "6 months of
+                          data that happens to stop." Added explicit short labels per month (Dec '25 vs
+                          Dec '26) since the naive "strip 2026" label logic couldn't tell the two
+                          Decembers apart once both were on the chart.
+    b011 · Jul 20, 2026 — Layout A: added the monthly bar chart back (removed in b008) — total projects
+                          per month, single-color bars, no per-tier stacking/legend (tiers stay cut).
+                          Data is the same monthly increments already backing Layout B's cumulative line.
+                          Layout B: the gauge's numbers were sitting on top of the ring, hard to read
+                          against the arc — moved them into a text block beside the gauge instead
+                          (.hero is back to a two-part flex row: bare ring + adjacent gauge-info text).
+    b010 · Jul 20, 2026 — moved the contract term (start/end dates) into the shared page subhead —
+                          a whole card just to show two dates was overkill. Removed Layout A's standalone
+                          "Contract Term" panel and Layout B's "Contract" details card entirely, along
+                          with the CSS those two removed pieces were the only users of (.panel,
+                          .panel-title, .kv-row, .details-card/.details-grid/.det, .term-bar).
+    b009 · Jul 20, 2026 — fixed Layout B's hero card: after b006 pared hero-summary down to a single
+                          "Remaining" row, the card's 240px/1fr grid left that one row stranded in a
+                          sea of whitespace far right of the gauge. Folded Remaining into the gauge's own
+                          caption (second line under "of 200 pre-purchased") and dropped the now-empty
+                          second grid column — .hero is a centered single column now. Removed the dead
+                          .hero-summary/.sum-* CSS.
+    b008 · Jul 20, 2026 — removed all tier references and the monthly breakdown for a simpler v1.
+                          Layout A: cut the monthly stacked bar chart + its toggle, and the "Projects by
+                          Tier" panel (Contract Term is now the only panel in that row, no more two-col).
+                          Layout B: cut the monthly horizontal rows + its toggle, and the "Projects by
+                          Tier" card. Kept the cumulative usage-to-date line chart in Layout B — it's a
+                          total-only trajectory, not a tier or monthly breakdown. Dropped MONTHLY/
+                          TIER_COLORS and all chart/tier CSS that only those removed pieces used.
+    b007 · Jul 20, 2026 — Layout A: removed the two stat tiles (Projects Used, Remaining) entirely and
+                          folded their numbers into the Contract usage bar card — one component instead
+                          of two, per PM feedback that the tiles were themselves redundant with the
+                          bar rather than the other way around (b006 had kept the tiles and stripped the
+                          bar). Removed the now-unused .stat-grid/.stat-card CSS.
+    b006 · Jul 20, 2026 — de-duplicated both layouts: every fact now has exactly one canonical location.
+                          Layout A: dropped the "140 / 200 projects" value + "140 used / 60 remaining"
+                          legend from the Contract usage bar (redundant with the stat tiles above it;
+                          bar is now a pure visual), dropped "through Dec 28, 2026" from the Remaining
+                          tile (redundant with Contract Term), dropped Pre-purchased pool from Contract
+                          Term (redundant with the Used tile's /200 denominator). Layout B: hero-summary
+                          dropped Projects-used + Pre-purchased-pool rows (both already in the gauge),
+                          Contract details-grid dropped the same two (already in the gauge) — down to just
+                          Remaining in the summary and Contract start/end in the details grid.
+    b005 · Jul 20, 2026 — switched the measured/denominated metric from area-based "units" (acres/miles)
+                          to PROJECT COUNT — grounded in the real CivilGrid Order Form pricing model
+                          (Project Unit = 0.5 mi or 20 acres per project; pools are sold and tracked in
+                          project count). Pool 1,600→200, Used 525→140 (now ties to the existing
+                          Projects-by-Tier total instead of a separate area-based tally), monthly +
+                          cumulative charts rebuilt as monthly project counts by tier.
+    b004 · Jul 20, 2026 — removed all dollar cost/value data (Contract value, Value consumed) from
+                          both layouts; this is a units-only credit-use dashboard now, no $ framing
+    b003 · Jul 15, 2026 — Added a "Linear project" link (Billing & Fee Transparency) to the About panel.
+    b002 · Jul 8, 2026 — removed utilization %, monthly run/burn rate, and ALL expected-usage/pacing
+                          (pace markers, projected-unused, on-plan pace, burn-up projection, term-elapsed %);
+                          pared to purchased-vs-used-to-date per feedback
+    b001 · Jul 7, 2026 — initial build (merged A + B with header toggle)
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contract Pre-Buy &amp; Usage (A/B) — CivilGrid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=Noto+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#ffffff;
+    --grey-10:#f4f5f5; --grey-20:#e9eaeb; --grey-30:#d2d4d7; --grey-40:#babdc0;
+    --grey-50:#888c90; --grey-60:#6e7376; --grey-70:#54585b; --grey-80:#393b3d; --grey-90:#1d1e20;
+    --blue-10:#eaf5ff; --blue-20:#c0dbfe; --blue-40:#27b4f6; --blue-50:#196fe0; --blue-60:#134a91; --blue-80:#243442; --blue-90:#1f2c38;
+    --orange-50:#f27e31; --orange-60:#da712c; --orange-10:#ffefe5;
+    --green-20:#c8f5d2; --green-60:#0b7a09;
+    --yellow-10:#fffbef; --yellow-20:#ffefbb; --yellow-60:#db9c13;
+    --secondary:#656e75;
+    --brand:#f27e31;
+    --sans:"Noto Sans", system-ui, -apple-system, sans-serif;
+    --mono:"Noto Sans Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: var(--sans); background: var(--grey-10); color: var(--grey-90); padding-top: 32px; -webkit-font-smoothing: antialiased; }
+
+  /* ============ PROTOTYPE BAR ============ */
+  .proto-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 32px; background: #243442; display: flex; align-items: center; justify-content: center; padding: 0 16px; gap: 12px; user-select: none; }
+  .proto-badge { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: none; padding: 0; color: #f27e31; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .proto-center { display: flex; align-items: center; gap: 12px; }
+  .proto-build { flex-shrink: 0; color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  .proto-desc { font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; }
+  .proto-actions { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+  .proto-about-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; animation: fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse { 0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); } 50% { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); } }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+  /* A/B toggle */
+  .ab-toggle { display: inline-flex; background: rgba(255,255,255,0.12); border-radius: 12px; padding: 2px; gap: 2px; }
+  .ab-btn { border: none; background: transparent; color: rgba(255,255,255,0.7); font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 10px; cursor: pointer; transition: all 0.12s; }
+  .ab-btn:hover { color: #fff; }
+  .ab-btn.active { background: #fff; color: #243442; }
+
+  .info-panel { display: none; position: fixed; top: 32px; right: 0; width: 340px; background: #ffffff; border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px; padding: 16px; z-index: 199; box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px; color: #393b3d; line-height: 1.5; max-height: calc(100vh - 40px); overflow-y: auto; }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  .fb-pane { display: none; position: fixed; top: 32px; right: 0; bottom: 0; width: 440px; max-width: 92vw; background: #fff; border-left: 1px solid #d2d4d7; box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199; flex-direction: column; overflow: hidden; }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+
+  /* ============ TOP NAV ============ */
+  .top-nav { position: sticky; top: 32px; z-index: 100; height: 36px; width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--white); border-bottom: 1px solid var(--grey-30); padding: 0 8px; }
+  .tn-left { display: flex; align-items: center; }
+  .tn-logo { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: var(--brand); text-transform: uppercase; line-height: 1; }
+  .tn-switcher { display: flex; align-items: center; gap: 6px; padding-left: 12px; font-size: 14px; font-weight: 500; color: var(--grey-90); cursor: pointer; }
+  .tn-switcher svg { width: 14px; height: 14px; }
+  .tn-right { display: flex; align-items: center; gap: 8px; }
+  .tn-icon-btn { position: relative; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--blue-80); cursor: pointer; border-radius: 4px; }
+  .tn-icon-btn:hover { background: var(--grey-10); }
+  .tn-icon-btn svg { width: 20px; height: 20px; }
+  .tn-badge { position: absolute; top: -1px; right: -2px; background: var(--brand); color:#fff; font-size: 9px; font-weight: 700; line-height: 1; padding: 2px 3px; border-radius: 8px; min-width: 15px; text-align: center; }
+  .tn-avatar { width: 24px; height: 24px; border-radius: 9999px; background: var(--blue-80); color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+  /* ============ LAYOUT ============ */
+  .app-body { display: flex; flex-direction: row; height: calc(100vh - 32px - 36px); }
+  .left-nav { width: 224px; flex: none; border-right: 1px solid var(--grey-30); background: var(--white); display: flex; flex-direction: column; }
+  .ln-home { display: flex; align-items: center; gap: 4px; margin: 8px 0; padding: 4px 8px; color: var(--blue-50); font-size: 14px; text-decoration: none; }
+  .ln-home svg { width: 16px; height: 16px; }
+  .ln-home span.txt { border-bottom: 1px solid transparent; }
+  .ln-home:hover span.txt { border-bottom-color: var(--blue-50); }
+  .ln-scroll { overflow-y: auto; padding: 8px; padding-bottom: 96px; }
+  .ln-org { margin: -8px 0 16px; border-left: 4px solid var(--brand); background: var(--white); padding: 4px; font-weight: 500; font-size: 14px; color: var(--grey-90); }
+  .ln-divider { margin: 8px 0; height: 1px; background: var(--grey-20); }
+  .ln-section { display: flex; flex-direction: column; gap: 4px; }
+  .ln-section-title { margin: 4px 0; padding: 0 4px; font-weight: 500; font-size: 14px; color: var(--secondary); }
+  .ln-item { display: block; padding: 4px 8px; border-radius: 2px; font-size: 14px; color: var(--grey-90); text-decoration: none; transition: all 0.05s; cursor: pointer; }
+  .ln-item:hover { background: var(--grey-20); }
+  .ln-item.active { background: var(--blue-10); color: var(--blue-60); font-weight: 500; }
+
+  .content { flex: 1; overflow-y: auto; padding: 16px 24px 64px; }
+  .content-col { max-width: 940px; }
+
+  .page-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .page-icon { width: 30px; height: 30px; border-radius: 6px; background: var(--orange-10); color: var(--orange-60); display: flex; align-items: center; justify-content: center; flex: none; }
+  .page-icon svg { width: 18px; height: 18px; }
+  .page-title { font-size: 20px; font-weight: 600; color: var(--grey-90); }
+  .page-sub { font-size: 14px; color: var(--secondary); margin: 0 0 24px 40px; }
+
+  .section-title { font-size: 16px; font-weight: 700; color: var(--grey-90); padding-left: 2px; margin: 0 0 12px; }
+  .section { margin-bottom: 32px; }
+  .card { background: var(--white); border: 1px solid var(--grey-30); border-radius: 8px; }
+
+  .unit-note { font-size: 12px; color: var(--grey-60); margin: 14px 0 0; padding: 0 2px; line-height: 1.5; }
+  .unit-note code { font-family: var(--mono); background: var(--grey-10); border: 1px solid var(--grey-20); border-radius: 3px; padding: 1px 5px; font-size: 11px; color: var(--grey-80); }
+
+  /* ===== LAYOUT A: progress bar ===== */
+  .usage-block { background: var(--white); border: 1px solid var(--grey-30); border-radius: 8px; padding: 20px; }
+  .usage-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .usage-head .lbl { font-size: 14px; font-weight: 500; color: var(--grey-80); }
+  .usage-head .val { font-family: var(--mono); font-size: 14px; color: var(--grey-70); }
+  .usage-track-wrap { position: relative; padding-top: 4px; }
+  .usage-track { height: 14px; border-radius: 9999px; background: var(--grey-20); overflow: hidden; }
+  .usage-legend-row { margin-top: 12px; display: flex; gap: 20px; font-size: 12px; color: var(--grey-60); }
+  .usage-legend-row .k { font-family: var(--mono); color: var(--grey-80); }
+  .usage-fill { height: 100%; border-radius: 9999px; background: linear-gradient(90deg, var(--blue-60), var(--blue-40)); width: 70%; }
+
+  .callout { display: flex; gap: 10px; align-items: flex-start; background: var(--blue-10); border: 1px solid var(--blue-20); border-radius: 8px; padding: 12px 14px; margin-top: 16px; }
+  .callout svg { width: 18px; height: 18px; color: var(--blue-60); flex: none; margin-top: 1px; }
+  .callout .co-body { font-size: 13px; color: var(--grey-80); line-height: 1.5; }
+  .callout .co-body b { color: var(--grey-90); }
+
+  .chart-card { background: var(--white); border: 1px solid var(--grey-30); border-radius: 8px; padding: 20px 20px 12px; margin-top: 16px; }
+  .chart-area { position: relative; height: 200px; margin-left: 34px; }
+  .chart-gridline { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--grey-20); }
+  .chart-ylabel { position: absolute; left: -34px; transform: translateY(-50%); font-size: 11px; font-family: var(--mono); color: var(--grey-50); width: 28px; text-align: right; }
+  .chart-cols { position: absolute; left: 0; right: 0; bottom: 0; top: 0; display: flex; align-items: flex-end; }
+  .chart-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; position: relative; cursor: pointer; }
+  .chart-col .col-bg { position: absolute; top: -8px; bottom: 0; left: 8px; right: 8px; border-radius: 4px; background: transparent; transition: background 0.08s; z-index: 0; }
+  .chart-col:hover .col-bg { background: var(--grey-10); }
+  .chart-bar { width: 46px; max-width: 60%; border-radius: 3px 3px 0 0; background: var(--blue-50); z-index: 1; }
+  .chart-xlabels { display: flex; margin-left: 34px; margin-top: 8px; }
+  .chart-xlabel { flex: 1; text-align: center; font-size: 12px; color: var(--grey-60); }
+  .chart-tip { position: absolute; display: none; z-index: 5; background: var(--blue-80); color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 12px; line-height: 1.6; box-shadow: 0 4px 12px rgba(0,0,0,0.25); pointer-events: none; white-space: nowrap; }
+  .chart-tip.show { display: block; }
+  .chart-tip b { display: block; margin-bottom: 2px; }
+
+  /* ===== LAYOUT B: gauge + trajectory ===== */
+  .hero { display: flex; align-items: center; justify-content: center; gap: 28px; padding: 24px; }
+  .gauge-wrap { position: relative; width: 200px; height: 200px; flex: none; }
+  .gauge-wrap svg { width: 200px; height: 200px; transform: rotate(-90deg); }
+  .gauge-info { display: flex; flex-direction: column; }
+  .gauge-pct { font-family: var(--mono); font-size: 40px; font-weight: 600; color: var(--grey-90); line-height: 1; }
+  .gauge-cap { font-size: 12px; color: var(--grey-50); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .gauge-units { font-family: var(--mono); font-size: 13px; color: var(--grey-70); margin-top: 6px; }
+
+  .burnup-card { padding: 20px 20px 8px; }
+  .burnup-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .burnup-title { font-size: 14px; font-weight: 600; color: var(--grey-80); }
+  .burnup-svg { width: 100%; height: auto; display: block; }
+  .bu-axis { font-family: var(--mono); font-size: 11px; fill: var(--grey-50); }
+  .bu-note { font-size: 11px; fill: var(--grey-60); font-family: var(--sans); }
+  .bu-legend { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--grey-20); }
+  .bu-leg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--grey-70); }
+  .bu-swatch { width: 22px; height: 0; border-top-width: 3px; border-top-style: solid; }
+  .bu-swatch.dash { border-top-style: dashed; }
+  .bu-tip { position: fixed; display: none; z-index: 210; background: var(--blue-80); color: #fff; border-radius: 6px; padding: 9px 12px; font-size: 12px; line-height: 1.6; box-shadow: 0 4px 12px rgba(0,0,0,0.25); pointer-events: none; white-space: nowrap; }
+  .bu-tip.show { display: block; }
+  .bu-tip .t-m { font-weight: 600; margin-bottom: 3px; }
+  .bu-tip .t-row { display: flex; justify-content: space-between; gap: 16px; }
+  .bu-tip .t-row .tv { font-family: var(--mono); }
+  .bu-tip .t-delta { margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(255,255,255,0.25); }
+
+  .pylon-bubble { position: fixed; bottom: 20px; left: 20px; width: 52px; height: 52px; border-radius: 9999px; background: var(--brand); box-shadow: 0 3px 10px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 150; }
+  .pylon-bubble svg { width: 24px; height: 24px; color: #fff; }
+  .pylon-bubble:hover { background: var(--orange-60); }
+</style>
+</head>
+<body>
+
+<!-- ============ PROTOTYPE BAR ============ -->
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <div class="proto-center">
+    <span class="proto-desc">Contract Pre-Buy &amp; Usage</span>
+    <div class="ab-toggle" role="group" aria-label="Layout toggle">
+      <button class="ab-btn active" data-variant="a" onclick="setVariant('a')">Layout A</button>
+      <button class="ab-btn" data-variant="b" onclick="setVariant('b')">Layout B</button>
+    </div>
+    <span class="proto-build" id="proto-build">BUILD —</span>
+  </div>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Contract Pre-Buy &amp; Usage (A/B)</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>One customer-facing page, two formatting takes, toggled from the Prototype bar. Same data both ways — which layout shows <b>how many projects were bought and how many you've used</b> fastest? No pacing, no projections, no expected-usage framing, and no dollar figures — project count only.</p></div>
+  <div class="info-panel-section"><strong>Linear project</strong><p><a href="https://linear.app/civilgrid/project/billing-and-fee-transparency-242e36812556" target="_blank" rel="noopener" style="color:#196fe0;text-decoration:none;font-weight:600;">Billing &amp; Fee Transparency &#8599;</a></p></div>
+  <div class="info-panel-section"><strong>Layout A — bar</strong><ul>
+    <li>One usage-bar card carries used/pool/remaining (no separate stat tiles — b007 folded them in)</li>
+    <li>Monthly bar chart below it, spanning the full contract term (Dec '25 – Dec '26) — total projects per month, no per-tier breakdown</li>
+    <li>Scannable, familiar dashboard pattern</li>
+  </ul></div>
+  <div class="info-panel-section"><strong>Layout B — gauge + trajectory</strong><ul>
+    <li>Radial gauge (ring only) with the numbers in a text block beside it, not overlaid on top (b011)</li>
+    <li>Cumulative projects-used-to-date line under the pool ceiling — hover the points</li>
+    <li>Calm, one-glance status of the contract</li>
+  </ul></div>
+  <div class="info-panel-section"><strong>What to notice</strong><p>Toggle A/B in the header. The pool is denominated in <b>Project Units (project count)</b>, not raw acreage/mileage — grounded in CivilGrid's real Order Form pricing (Project Unit = 0.5 mi or 20 acres per project). Every fact has exactly one canonical spot on the page: in Layout A that's the Contract usage bar card (used/pool/remaining, no separate tiles); in Layout B that's the gauge + adjacent text block. The contract term (start/end) lives in the shared page subhead now — a two-line card just to show two dates was overkill (b010). Tier breakdowns stay out (v1 is deliberately simple) but the monthly trend is back in as a single total-only bar chart (b011). Still no utilization %, run rate, projected usage, or dollar figures. Both stamp the feedback form with which layout you were viewing.</p></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b012</b> — Layout A's monthly bar chart now spans the full contract term (Dec '25 – Dec '26, 13 months) with empty columns for months with no usage yet, instead of stopping at the last month with data</li><li><b>b011</b> — Layout A: added back a monthly bar chart (total projects per month, no tiers). Layout B: moved the gauge's text out from on top of the ring to a text block beside it — the overlaid numbers were flagged as hard to read against the arc.</li><li><b>b010</b> — moved the contract term (start/end dates) into the page subhead; removed the standalone Contract Term panel (Layout A) and Contract details card (Layout B) entirely</li><li><b>b009</b> — fixed Layout B's hero card layout: folded the stranded "Remaining" row into the gauge caption, dropped the now-empty second grid column</li><li><b>b008</b> — removed all tier references and the monthly breakdown (chart + toggle in both layouts, "Projects by Tier" panels); kept Layout B's total-only cumulative trajectory chart</li><li><b>b007</b> — Layout A: removed the stat tiles, folded used/pool/remaining into the Contract usage bar card (one component, not two)</li><li><b>b006</b> — de-duplicated both layouts so every fact appears exactly once (see top-of-file changelog for the full list)</li><li><b>b005</b> — switched from area-based units to project count (grounded in the real Order Form pricing model); pool/used/monthly/cumulative data rebuilt accordingly</li><li><b>b004</b> — removed all dollar cost/value data; units-only credit-use dashboard</li><li><b>b003</b> — Added Linear project link to About panel</li><li><b>b002</b> — removed utilization %, monthly run/burn rate, and all expected-usage/pacing (pace markers, projected-unused, on-plan pace, burn-up projection, term-elapsed %); pared to purchased-vs-used-to-date</li><li><b>b001</b> — initial build (merged A + B with header toggle)</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Add pre-buy pool + term to org billing model, denominated in Project Units (project count)</li>
+      <li>Compute Project Units consumed per project (1 project = 1 unit, up to 0.5 mi / 20 acres; oversized projects consume more than one)</li>
+      <li>Monthly + cumulative projects-to-date series for the bar chart and trajectory view (v1: total only, no per-tier breakdown)</li>
+    </ul></div>
+    <div class="grp"><b>Customer UI (Org Settings)</b><ul>
+      <li>Add "Usage" tab to Org Settings nav (gate behind ViewSubscriptionInfo)</li>
+      <li>Build the chosen layout (A bar or B gauge+trajectory) — this A/B decides</li>
+      <li>Surface contract term (start/end) in the page subhead</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app</b><ul>
+      <li>Surface remaining pool on project create</li>
+      <li>Notify billing contact at pool thresholds via Knock</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>A/B: which layout do customers read faster <span class="note">(this test)</span></li>
+      <li>Decided b008: v1 ships without a tier breakdown or monthly breakdown — pool/used/remaining/term only; per-tier and monthly views may return in a later iteration <span class="note">(PM)</span></li>
+      <li>Decided b005: pool denominated in Project Units (project count), grounded in the real Order Form pricing model — not raw acreage/mileage, not committed $ <span class="note">(PM)</span></li>
+      <li>Decided b004: units only, no dollar/value-consumed figures shown to customer <span class="note">(PM)</span></li>
+      <li>Overage handling (exceeding the pool) not modeled here — real contracts already price per-project overage <span class="note">(see Jan 2026 Order Form)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<!-- ============ TOP NAV ============ -->
+<nav class="top-nav">
+  <div class="tn-left">
+    <span class="tn-logo">CivilGrid</span>
+    <div class="tn-switcher">
+      <span>Settings</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+  </div>
+  <div class="tn-right">
+    <div class="tn-icon-btn" title="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="tn-badge">9+</span>
+    </div>
+    <div class="tn-icon-btn" title="Help">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+    </div>
+    <div class="tn-avatar" title="Nathan Stankowski">NS</div>
+  </div>
+</nav>
+
+<div class="app-body">
+  <!-- ============ LEFT NAV ============ -->
+  <aside class="left-nav">
+    <a class="ln-home" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      <span class="txt">Home</span>
+    </a>
+    <div class="ln-scroll">
+      <div class="ln-org">Ridgeline Utility Partners</div>
+      <div class="ln-divider"></div>
+      <div class="ln-section">
+        <a class="ln-item" href="#">General</a>
+        <a class="ln-item" href="#">Plan</a>
+        <a class="ln-item" href="#">Billing</a>
+        <a class="ln-item active" href="#">Usage</a>
+      </div>
+      <div class="ln-divider"></div>
+      <div class="ln-section">
+        <div class="ln-section-title">Team</div>
+        <a class="ln-item" href="#">Members</a>
+        <a class="ln-item" href="#">Roles &amp; Permissions</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ CONTENT ============ -->
+  <main class="content">
+   <div class="content-col">
+    <div class="page-head">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v4h6V3"/><path d="M8 12h8M8 16h5"/></svg>
+      </div>
+      <div class="page-title">Contract Usage</div>
+    </div>
+    <p class="page-sub">Your pre-purchased project pool and how many you've used this term (Dec 29, 2025 – Dec 28, 2026).</p>
+
+    <!-- ===================== LAYOUT A ===================== -->
+    <div id="variant-a">
+      <div class="section">
+        <div class="section-title">Project Pre-Purchase</div>
+
+        <div class="usage-block">
+          <div class="usage-head">
+            <span class="lbl">Contract usage</span>
+            <span class="val">140 / 200 projects</span>
+          </div>
+          <div class="usage-track-wrap">
+            <div class="usage-track"><div class="usage-fill"></div></div>
+          </div>
+          <div class="usage-legend-row">
+            <span><span class="k">140</span> used</span>
+            <span><span class="k">60</span> remaining</span>
+          </div>
+        </div>
+
+        <p class="unit-note">
+          A <b>Project Unit</b> is one project — up to <code>0.5 miles</code> (linear) or <code>20 acres</code> (area). Projects larger than that draw more than one unit. See <b>Billing</b> for your per-tier rates.
+        </p>
+
+        <div class="chart-card">
+          <div class="usage-head" style="margin-bottom:12px"><span class="lbl">Monthly usage</span></div>
+          <div class="chart-area" id="chart-area">
+            <div class="chart-tip" id="chart-tip"></div>
+            <div class="chart-cols" id="chart-cols"></div>
+          </div>
+          <div class="chart-xlabels" id="chart-xlabels"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== LAYOUT B ===================== -->
+    <div id="variant-b" style="display:none">
+      <div class="section">
+        <div class="section-title">Project Pre-Purchase</div>
+        <div class="card hero">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 200 200">
+              <defs>
+                <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#134a91"/>
+                  <stop offset="100%" stop-color="#27b4f6"/>
+                </linearGradient>
+              </defs>
+              <circle cx="100" cy="100" r="78" fill="none" stroke="#e9eaeb" stroke-width="16"/>
+              <circle id="gauge-val" cx="100" cy="100" r="78" fill="none" stroke="url(#gaugeGrad)" stroke-width="16" stroke-linecap="round" stroke-dasharray="490.1" stroke-dashoffset="490.1"/>
+            </svg>
+          </div>
+          <div class="gauge-info">
+            <div class="gauge-pct">140</div>
+            <div class="gauge-cap">projects used</div>
+            <div class="gauge-units">of 200 pre-purchased</div>
+            <div class="gauge-units">60 remaining</div>
+          </div>
+        </div>
+        <p class="unit-note">
+          A <b>Project Unit</b> is one project — up to <code>0.5 miles</code> (linear) or <code>20 acres</code> (area). Larger projects draw more than one unit. See <b>Billing</b> for your per-tier rates.
+        </p>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Usage to Date</div>
+        <div class="card burnup-card">
+          <div class="burnup-head">
+            <span class="burnup-title">Cumulative projects used over the contract term</span>
+          </div>
+          <svg class="burnup-svg" id="burnup" viewBox="0 0 760 340" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="bu-legend">
+            <span class="bu-leg"><span class="bu-swatch" style="border-top-color:var(--blue-50)"></span>Projects used to date</span>
+            <span class="bu-leg"><span class="bu-swatch" style="border-top-color:var(--grey-80)"></span>Contracted pool</span>
+          </div>
+        </div>
+      </div>
+    </div>
+   </div>
+  </main>
+</div>
+
+<div class="pylon-bubble" title="Chat with Support">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z"/></svg>
+</div>
+
+<div class="bu-tip" id="bu-tip"></div>
+
+<!-- ============ FEEDBACK PANE ============ -->
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+  /* ===== Build stamp ===== */
+  const BUILD = 12;
+  const BUILD_DATE = "Jul 20, 2026";
+  const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+  document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+  /* ===== About panel ===== */
+  function toggleInfo() {
+    const ip = document.getElementById('info-panel');
+    const willOpen = !ip.classList.contains('open');
+    ip.classList.toggle('open');
+    if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+  }
+
+  /* ===== A/B layout toggle ===== */
+  function setVariant(v) {
+    document.getElementById('variant-a').style.display = (v === 'a') ? 'block' : 'none';
+    document.getElementById('variant-b').style.display = (v === 'b') ? 'block' : 'none';
+    document.querySelectorAll('.ab-btn').forEach(b => b.classList.toggle('active', b.dataset.variant === v));
+    window.__activeScreen = (v === 'a') ? 'Layout A — tiles + bars' : 'Layout B — gauge + trajectory';
+  }
+
+  /* ===== Feedback (shared Prototype Feedback Google Form) ===== */
+  const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+  const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+  const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+  const PROTOTYPE_NAME = "Contract Pre-Buy & Usage (A/B)";
+  window.__activeScreen = "Layout A — tiles + bars";
+  function fbUrl(embedded) {
+    const u = new URL(FEEDBACK_FORM_BASE);
+    if (embedded) u.searchParams.set("embedded", "true");
+    u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+    u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+    u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+    return u.toString();
+  }
+  function fbOpen() {
+    document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+    document.getElementById('fb-frame').src = fbUrl(true);
+    document.getElementById('fb-newtab').href = fbUrl(false);
+    document.getElementById('info-panel').classList.remove('open');
+    document.getElementById('fb-pane').classList.add('open');
+  }
+  function fbClose() { document.getElementById('fb-pane').classList.remove('open'); }
+  document.getElementById('fb-open').onclick = fbOpen;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fbClose(); });
+
+  /* ===== Shared data ===== */
+  /* POOL is Project Units (project count) — grounded in the real Order Form pricing model
+     (Project Unit = 0.5 mi or 20 acres per project). MONTHLY totals are the same monthly increments
+     behind the Layout B cumulative line (18, 41-18, 67-41, 87-67, 116-87, 140-116) — total only,
+     no per-tier breakdown (dropped in b008, staying dropped). Spans the FULL contract term
+     (Dec 29, 2025 – Dec 28, 2026), not just the months with usage so far — Dec '25 (contract just
+     started) and Jul–Dec '26 (haven't happened yet) render as empty columns rather than being omitted. */
+  const POOL = 200;
+  const MONTHLY = [
+    { m: "Dec 2025", short: "Dec ’25", total: 0 },
+    { m: "Jan 2026", short: "Jan",     total: 18 },
+    { m: "Feb 2026", short: "Feb",     total: 23 },
+    { m: "Mar 2026", short: "Mar",     total: 26 },
+    { m: "Apr 2026", short: "Apr",     total: 20 },
+    { m: "May 2026", short: "May",     total: 29 },
+    { m: "Jun 2026", short: "Jun",     total: 24 },
+    { m: "Jul 2026", short: "Jul",     total: 0 },
+    { m: "Aug 2026", short: "Aug",     total: 0 },
+    { m: "Sep 2026", short: "Sep",     total: 0 },
+    { m: "Oct 2026", short: "Oct",     total: 0 },
+    { m: "Nov 2026", short: "Nov",     total: 0 },
+    { m: "Dec 2026", short: "Dec ’26", total: 0 },
+  ];
+
+  /* ===== LAYOUT A: monthly bar chart (total only, no tiers) ===== */
+  const Y_MAX = 30, AREA_H = 200;
+  function pxA(v) { return (v / Y_MAX) * AREA_H; }
+  (function buildBarChart() {
+    const area = document.getElementById("chart-area");
+    for (let g = 0; g <= Y_MAX; g += 10) {
+      const y = AREA_H - pxA(g);
+      const line = document.createElement("div"); line.className = "chart-gridline"; line.style.top = y + "px"; area.appendChild(line);
+      const lbl = document.createElement("div"); lbl.className = "chart-ylabel"; lbl.style.top = y + "px"; lbl.textContent = g; area.appendChild(lbl);
+    }
+    const cols = document.getElementById("chart-cols");
+    const xlabels = document.getElementById("chart-xlabels");
+    MONTHLY.forEach(d => {
+      const col = document.createElement("div"); col.className = "chart-col"; col.innerHTML = '<div class="col-bg"></div>';
+      const bar = document.createElement("div"); bar.className = "chart-bar"; bar.style.height = pxA(d.total) + "px";
+      col.appendChild(bar);
+      col.addEventListener("mousemove", e => showBarTip(e, d));
+      col.addEventListener("mouseleave", hideBarTip);
+      cols.appendChild(col);
+      const xl = document.createElement("div"); xl.className = "chart-xlabel"; xl.textContent = d.short; xlabels.appendChild(xl);
+    });
+  })();
+  function showBarTip(e, d) {
+    const tip = document.getElementById("chart-tip");
+    tip.innerHTML = '<b>' + d.m + '</b>' + d.total + ' projects';
+    tip.classList.add("show");
+    const rect = document.getElementById("chart-area").getBoundingClientRect();
+    let x = e.clientX - rect.left + 14; if (x + 140 > rect.width) x = e.clientX - rect.left - 140;
+    let y = e.clientY - rect.top - 10; if (y < 0) y = 0;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  function hideBarTip() { document.getElementById("chart-tip").classList.remove("show"); }
+
+  /* ===== LAYOUT B: gauge ===== */
+  (function () { const C = 2 * Math.PI * 78; const frac = 140 / 200; document.getElementById("gauge-val").setAttribute("stroke-dashoffset", (C * (1 - frac)).toFixed(1)); })();
+
+  /* ===== LAYOUT B: cumulative usage-to-date chart ===== */
+  const ACTUAL = [
+    [0.000, 0,   "Dec 29, 2025 (start)"], [0.090, 18, "Jan 2026"], [0.167, 41, "Feb 2026"],
+    [0.252, 67, "Mar 2026"], [0.334, 87, "Apr 2026"], [0.419, 116, "May 2026"],
+    [0.501, 140, "Jun 2026"], [0.521, 140, "Today · Jul 8, 2026"],
+  ];
+  const TODAY_X = 0.521;
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const MG = { l: 46, r: 96, t: 18, b: 34 }, VW = 760, VH = 340;
+  const plotW = VW - MG.l - MG.r, plotH = VH - MG.t - MG.b;
+  const xPx = f => MG.l + f * plotW;
+  const yPx = v => MG.t + (1 - v / POOL) * plotH;
+  function el(name, attrs) { const e = document.createElementNS(SVGNS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function pts(arr) { return arr.map(p => xPx(p[0]).toFixed(1) + "," + yPx(p[1]).toFixed(1)).join(" "); }
+  (function buildBurnup() {
+    const svg = document.getElementById("burnup");
+    [0, 50, 100, 150, 200].forEach(v => {
+      const y = yPx(v);
+      svg.appendChild(el("line", { x1: MG.l, y1: y, x2: VW - MG.r, y2: y, stroke: "#e9eaeb", "stroke-width": 1, "stroke-dasharray": v === 0 ? "0" : "3 3" }));
+      const t = el("text", { x: MG.l - 8, y: y + 4, "text-anchor": "end", class: "bu-axis" }); t.textContent = v.toLocaleString(); svg.appendChild(t);
+    });
+    [[0, "Dec"], [0.25, "Mar"], [0.5, "Jun"], [0.75, "Sep"], [1, "Dec"]].forEach(([f, l]) => {
+      const t = el("text", { x: xPx(f), y: VH - 12, "text-anchor": "middle", class: "bu-axis" }); t.textContent = l; svg.appendChild(t);
+    });
+    svg.appendChild(el("line", { x1: MG.l, y1: yPx(POOL), x2: VW - MG.r, y2: yPx(POOL), stroke: "#243442", "stroke-width": 2 }));
+    const ct = el("text", { x: VW - MG.r + 6, y: yPx(POOL) + 4, class: "bu-note", fill: "#393b3d" }); ct.textContent = "Pool 200"; svg.appendChild(ct);
+    svg.appendChild(el("polyline", { points: pts(ACTUAL), fill: "none", stroke: "#196fe0", "stroke-width": 2.5 }));
+    svg.appendChild(el("line", { x1: xPx(TODAY_X), y1: MG.t, x2: xPx(TODAY_X), y2: VH - MG.b, stroke: "#888c90", "stroke-width": 1, "stroke-dasharray": "2 3" }));
+    const tt = el("text", { x: xPx(TODAY_X), y: MG.t - 4, "text-anchor": "middle", class: "bu-note", fill: "#54585b" }); tt.textContent = "Today"; svg.appendChild(tt);
+    function addPoint(p) {
+      const cx = xPx(p[0]), cy = yPx(p[1]);
+      svg.appendChild(el("circle", { cx, cy, r: 3.5, fill: "#196fe0", stroke: "#196fe0", "stroke-width": 2 }));
+      const hit = el("circle", { cx, cy, r: 12, fill: "transparent", style: "cursor:pointer" });
+      hit.addEventListener("mousemove", e => showBuTip(e, p));
+      hit.addEventListener("mouseleave", hideBuTip);
+      svg.appendChild(hit);
+    }
+    ACTUAL.forEach(p => addPoint(p));
+    svg.appendChild(el("circle", { cx: xPx(TODAY_X), cy: yPx(140), r: 4.5, fill: "#243442" }));
+  })();
+  function showBuTip(e, p) {
+    const tip = document.getElementById("bu-tip");
+    tip.innerHTML = '<div class="t-m">' + p[2] + '</div>' +
+      '<div class="t-row"><span>Projects used</span><span class="tv">' + p[1].toLocaleString() + ' projects</span></div>';
+    tip.classList.add("show");
+    let x = e.clientX + 14, y = e.clientY - 10; if (x + 200 > window.innerWidth) x = e.clientX - 200;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  function hideBuTip() { document.getElementById("bu-tip").classList.remove("show"); }
+</script>
+</body>
+</html>
