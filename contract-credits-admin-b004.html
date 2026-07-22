@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  BUILD b004 · Jul 22, 2026
+  Build history (newest first):
+    b004 · Jul 22, 2026 — tied contract setup to SALESFORCE per CS feedback (Jul 21). The Project
+      Pool + contract term now pull from a Salesforce Opportunity instead of freeform entry: an Opp ID
+      lookup auto-populates the pool (read-only, Salesforce-sourced) and the term. Contract dates stay
+      editable as an OVERRIDE for the utility edge case CS raised (projects loaded/initiated before the
+      contract start date) — overriding a date shows an "overridden" tag + a reset-to-Salesforce link,
+      and never touches the SF-sourced pool. Added a Contract selector (an org can hold multiple
+      contracts, each tied to one Opportunity) + "Link new from Salesforce". Captured a note from CS that a
+      lot of this usage tracking already lives in the delivery app and should move to this surface, not
+      be duplicated (Decisions & spikes).
+    b003 · Jul 20, 2026 — added an "Overage Notifications" section to the Contracts tab: a toggle
+      ("notify account owner(s) when this org exceeds its Project Pool") + a free-form list of
+      recipient emails (add/remove). Disabling the toggle greys out the recipient list rather than
+      clearing it. No real send — this is the configuration surface only; the actual email would go
+      through Knock (CivilGrid's notification infra) once the pool-exceeded trigger exists. Flagged an
+      open question in the Linear breakdown: is the "account owner" the customer's own billing contact,
+      or CivilGrid's internal AE/CSM?
+    b002 · Jul 20, 2026 — switched the measured/set metric from area-based "units" to PROJECT COUNT —
+      grounded in CivilGrid's real Order Form pricing model (Project Unit = 0.5 mi or 20 acres per
+      project; contracts are sold and tracked as a project count, e.g. "100 Project Units"). Renamed
+      "Pre-Purchased Pool (units)" to "Project Pool (# of Projects)"; rescaled the fictional Acme
+      numbers from an arbitrary area-unit tally (212 of 800) to a realistic project count (42 of 100),
+      matching the scale of the real Jan 2026 Order Form example. Matches the metric switch made the
+      same session on contract-prebuy-usage-ab-b005.html, the customer-facing counterpart.
+    b001 · Jul 20, 2026 — initial build. Split out of feature-provisioning-tab-b024's Contracts tab
+      into its own standalone prototype — flagged Contracts as a distinct concept that only
+      happens to share the Update Organization Subscription admin page and tab-bar pattern with
+      Feature Provisioning, not an evolution of it. See feature-provisioning-tab-b025.html (the
+      Feature Provisioning prototype, reverted back to its own scope in the same session).
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contract Credits — Admin — CivilGrid</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Noto Sans", system-ui, -apple-system, sans-serif;
+    background: #f4f5f5;
+    color: #1d1e20;
+    padding-top: 32px;
+    font-size: 14px;
+  }
+
+  /* ===== Prototype bar ===== */
+  .proto-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    height: 32px; background: #243442;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 16px; gap: 10px; user-select: none;
+  }
+  .proto-badge {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    background: none; padding: 0; color: #f27e31;
+    font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .proto-build {
+    flex-shrink: 0; color: rgba(255,255,255,0.5);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.4px;
+  }
+  .proto-desc {
+    font-size: 12px; color: rgba(255,255,255,0.65);
+    white-space: nowrap; padding: 2px 6px;
+  }
+  .proto-actions {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .proto-about-btn {
+    border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s;
+  }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn {
+    border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s;
+    animation: fbPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes fbPulse {
+    0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); }
+    50%      { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); }
+  }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+  .info-panel {
+    display: none; position: fixed; top: 32px; right: 0;
+    width: 340px; background: #ffffff;
+    border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px;
+    padding: 16px; z-index: 199;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    font-size: 13px; color: #393b3d; line-height: 1.5;
+    max-height: calc(100vh - 40px); overflow-y: auto;
+  }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  /* collapsible "if we build this" Linear breakdown — bottom of the panel */
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  /* ===== Top nav ===== */
+  .top-nav {
+    position: sticky; top: 32px; z-index: 100;
+    height: 56px; background: #fff;
+    border-bottom: 1px solid #d2d4d7;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+  }
+  .nav-left { display: flex; align-items: center; gap: 16px; }
+  .wordmark { color: #f27e31; font-weight: 800; letter-spacing: 1px; font-size: 20px; }
+  .nav-admin { font-size: 14px; color: #393b3d; display: flex; align-items: center; gap: 4px; }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .nav-icon { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #babdc0; color: #6e7376; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .nav-badge { position: relative; }
+  .nav-badge::after { content: "9+"; position: absolute; top: -6px; right: -8px; background: #d61e17; color: #fff; font-size: 9px; font-weight: 700; border-radius: 8px; padding: 1px 4px; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: #243442; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+
+  /* ===== Layout ===== */
+  .layout { display: flex; min-height: calc(100vh - 88px); }
+
+  /* Left nav */
+  .left-nav { width: 224px; flex-shrink: 0; border-right: 1px solid #d2d4d7; background: #fff; padding: 8px; }
+  .home-link { display: flex; align-items: center; gap: 4px; color: #196fe0; font-size: 14px; padding: 4px 8px; margin: 8px 0; cursor: pointer; }
+  .home-link:hover span:last-child { border-bottom: 1px solid #196fe0; }
+  .nav-section { margin-bottom: 8px; }
+  .nav-section-title { font-size: 16px; font-weight: 500; color: #656e75; padding: 4px 4px; margin-bottom: 2px; }
+  .nav-item { font-size: 14px; color: #1d1e20; padding: 4px 8px; border-radius: 2px; cursor: pointer; }
+  .nav-item:hover { background: #e9eaeb; }
+  .nav-item.active { background: #eaf5ff; color: #134a91; font-weight: 500; }
+  .nav-divider { height: 1px; background: #d2d4d7; margin: 8px 0; }
+
+  /* Content */
+  .content { flex: 1; overflow: auto; padding: 24px 28px 80px; max-width: 1180px; }
+  .page-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; }
+  .field-label { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+
+  /* Org selector */
+  .org-select {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 16px; color: #1d1e20; cursor: pointer;
+  }
+  .org-select .chev { color: #888c90; font-size: 12px; }
+  .org-select-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 20px; }
+  .org-select-row .lbl { font-size: 16px; color: #54585b; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid #d2d4d7; margin-bottom: 24px; }
+  .tab {
+    font-size: 14px; font-weight: 500; color: #54585b;
+    padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; transition: all 0.1s;
+  }
+  .tab:hover { color: #1d1e20; }
+  .tab.active { color: #134a91; border-bottom-color: #196fe0; }
+
+  /* Stub tab content (Pricing, Feature Provisioning — out of scope here) */
+  .stub {
+    display: none; background: #fff; border: 1px solid #e9eaeb; border-radius: 8px;
+    padding: 40px; text-align: center; color: #888c90; font-size: 14px;
+  }
+  .stub.show { display: block; }
+
+  /* Contracts panel */
+  .panel { display: none; }
+  .panel.show { display: block; }
+
+  .org-intro {
+    background: #eaf5ff; border: 1px solid #cfe4fb; border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 14px;
+    font-size: 12px; color: #134a91; line-height: 1.5;
+  }
+  .org-intro b { font-weight: 600; }
+  .org-actionbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 12px;
+  }
+  .override-summary { font-size: 12px; color: #54585b; }
+  .override-summary.none { color: #888c90; }
+  .save-cluster { display: flex; align-items: center; gap: 10px; }
+  .dirty-note { font-size: 12px; color: #db9c13; }
+  .btn { font-size: 14px; font-weight: 500; padding: 7px 16px; border-radius: 4px; cursor: pointer; border: 1px solid transparent; }
+  .btn-primary { background: #243442; color: #fff; }
+  .btn-primary:hover { background: #1f2c38; }
+
+  /* Contracts tab */
+  .contract-current {
+    display: flex; flex-wrap: wrap; gap: 28px;
+    background: #fff; border: 1px solid #d2d4d7; border-radius: 8px;
+    padding: 14px 18px; margin-bottom: 18px;
+  }
+  .cc-stat { display: flex; flex-direction: column; gap: 2px; }
+  .cc-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #888c90; font-weight: 600; }
+  .cc-value { font-size: 15px; font-weight: 600; color: #1d1e20; }
+  .cc-value.text { font-weight: 500; font-size: 13px; }
+  .contract-form { display: flex; gap: 20px; flex-wrap: wrap; max-width: 640px; background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; padding: 18px; }
+  .cf-field { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+  .cf-field label { font-size: 12px; color: #1d1e20; }
+  .cf-field input {
+    height: 28px; padding: 4px 8px; font-size: 12px; font-family: inherit;
+    border: 1px solid #d2d4d7; border-radius: 2px; outline: none; color: #1d1e20;
+  }
+  .cf-field input:focus { border-color: #196fe0; }
+
+  .notify-block { background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; padding: 18px; margin-top: 20px; max-width: 520px; }
+  .notify-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 10px; }
+  .notify-toggle { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #1d1e20; cursor: pointer; }
+  .notify-toggle input { margin-top: 2px; }
+  .notify-body { margin-top: 12px; }
+  .notify-body.disabled { opacity: 0.4; pointer-events: none; }
+  .notify-recipients { display: flex; flex-direction: column; gap: 8px; }
+  .notify-row { display: flex; align-items: center; gap: 8px; }
+  .notify-email { flex: 1; height: 28px; padding: 4px 8px; font-size: 12px; font-family: inherit; border: 1px solid #d2d4d7; border-radius: 2px; outline: none; color: #1d1e20; }
+  .notify-email:focus { border-color: #196fe0; }
+  .notify-remove { border: none; background: none; color: #888c90; font-size: 16px; line-height: 1; cursor: pointer; padding: 0 4px; }
+  .notify-remove:hover { color: #d61e17; }
+  .notify-add { border: none; background: none; color: #196fe0; font-size: 12px; cursor: pointer; padding: 0; margin-top: 10px; }
+  .notify-add:hover { text-decoration: underline; }
+
+  /* ===== Contract selector (an org can hold multiple contracts) ===== */
+  .contract-picker-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .contract-picker-row .lbl { font-size: 14px; color: #54585b; }
+  .mini-select { position: relative; display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: #1d1e20; cursor: pointer; border: 1px solid #d2d4d7; border-radius: 4px; padding: 6px 12px; background: #fff; }
+  .mini-select:hover { border-color: #babdc0; }
+  .mini-select .chev { color: #888c90; font-size: 11px; }
+  .mini-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 340px; background: #fff; border: 1px solid #d2d4d7; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.14); z-index: 50; padding: 4px; }
+  .mini-menu.open { display: block; }
+  .mini-item { padding: 7px 10px; border-radius: 3px; font-size: 13px; color: #1d1e20; cursor: pointer; }
+  .mini-item:hover { background: #e9eaeb; }
+  .mini-item.active { background: #eaf5ff; color: #134a91; font-weight: 500; }
+  .mini-item.add { color: #196fe0; }
+  .mini-sep { height: 1px; background: #e9eaeb; margin: 4px 0; }
+
+  /* ===== Salesforce-linked contract setup ===== */
+  .btn-secondary { background: #fff; color: #243442; border: 1px solid #d2d4d7; }
+  .btn-secondary:hover { background: #f4f5f5; }
+  .sf-block { background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; padding: 18px; margin-top: 4px; max-width: 640px; }
+  .sf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+  .sf-title { font-size: 14px; font-weight: 600; color: #1d1e20; display: flex; align-items: center; gap: 7px; }
+  .sf-cloud { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #0b7a09; background: #e7f7e9; border: 1px solid #c8f5d2; border-radius: 10px; padding: 1px 8px; }
+  .sf-provenance { font-size: 12px; color: #888c90; }
+  .sf-link { color: #196fe0; cursor: pointer; }
+  .sf-link:hover { text-decoration: underline; }
+  .sf-lookup { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 6px; }
+  .sf-hint { font-size: 12px; color: #db9c13; min-height: 16px; margin: 0 0 12px 2px; }
+  .sf-synced { border-top: 1px solid #e9eaeb; padding-top: 14px; }
+  .sf-grid { display: flex; flex-wrap: wrap; gap: 28px; margin-bottom: 16px; }
+  .sf-cell { display: flex; flex-direction: column; gap: 3px; }
+  .sf-cell-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #888c90; font-weight: 600; }
+  .sf-cell-value { font-size: 14px; color: #1d1e20; }
+  .sf-tag { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; color: #134a91; background: #eaf5ff; border: 1px solid #cfe4fb; border-radius: 10px; padding: 1px 7px; margin-left: 4px; vertical-align: middle; }
+  .sf-dates { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+  .ovr-tag { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; color: #8a5a00; background: #fffbef; border: 1px solid #ffefbb; border-radius: 10px; padding: 1px 6px; margin-left: 4px; }
+  .sf-link.reset { font-size: 12px; padding-bottom: 6px; white-space: nowrap; }
+  .sf-edge { background: #fffbef; border: 1px solid #ffefbb; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #54585b; line-height: 1.5; }
+  .sf-edge b { color: #1d1e20; }
+
+  /* feedback — right-hand pane (matches the info panel placement) */
+  .fb-pane {
+    display: none; position: fixed; top: 32px; right: 0; bottom: 0;
+    width: 440px; max-width: 92vw; background: #fff;
+    border-left: 1px solid #d2d4d7;
+    box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199;
+    flex-direction: column; overflow: hidden;
+  }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Contract Credits — Admin (Org Subscription)</span>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Contract Credits — Admin</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>Give admin a way to set an org's pre-purchased <b>Project Pool</b> (project count) and contract term by <b>linking a Salesforce Opportunity</b> — the pool and term pull from Salesforce instead of freeform entry, so what admin sets always matches what was sold. The input side of the customer-facing Usage view (<code>contract-prebuy-usage</code>).</p></div>
+  <div class="info-panel-section"><strong>Linear project</strong><p><a href="https://linear.app/civilgrid/project/billing-and-fee-transparency-242e36812556" target="_blank" rel="noopener" style="color:#196fe0;text-decoration:none;font-weight:600;">Billing &amp; Fee Transparency &#8599;</a></p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li><b>Salesforce-linked (b004).</b> Instead of freeform entry, admin picks or links a <b>Salesforce Opportunity</b>: the <b>Look up</b> action pulls the Project Pool (project count) and contract term straight from Salesforce. The pool is <b>read-only</b> — it always comes from the Opportunity, so admin can't silently diverge from what was sold.</li>
+    <li><b>Dates are an override.</b> Contract Start/End default to the Salesforce values but stay editable — for the utility edge case where projects are loaded/initiated <i>before</i> the contract start date. Overriding a date shows an "overridden" tag + a <b>Reset to Salesforce dates</b> link; the pool is never touched.</li>
+    <li><b>Multiple contracts per org.</b> The <b>Contract</b> selector at the top switches between an org's contracts (each tied to one Opportunity), or links a new one from Salesforce. Pairs with the customer-facing per-contract Usage view.</li>
+    <li>The pool is denominated in <b>Project Units (project count)</b> — grounded in CivilGrid's real Order Form pricing (Project Unit = 0.5 mi or 20 acres per project; contracts are sold as e.g. "100 Project Units"). A status strip (projects created, pool, remaining, term) sits above so admin has context.</li>
+    <li><b>Save</b> confirms the org's Usage view now reflects these values — this is exactly what <code>contract-prebuy-usage</code> reads from. <b>Overage Notifications</b> — toggle + recipient list so account owner(s) get emailed when this org exceeds its pool.</li>
+    <li>Lives on the same <b>Update Organization Subscription</b> admin page as Pricing and Feature Provisioning (same tab bar) — those two are stubbed here to keep the focus on Contracts.</li>
+  </ul></div>
+  <div class="info-panel-section"><strong>Not real yet</strong><p>Acme, Inc. Organization, its numbers (42 created / 100 pool), and the Opportunity IDs are fictional but scaled to the real Jan 2026 Order Form example. The Salesforce "lookup" doesn't call Salesforce — it loads canned per-contract data. No save/persistence; the email isn't wired (real send would go through Knock). The Feedback button submits to a live Google Form (stamped with prototype + build + screen).</p></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b004</b> — tied contract setup to Salesforce: Opportunity lookup auto-populates the pool (read-only) + term; dates stay editable as an override for the utility early-load edge case; added a multi-contract selector + "Link new from Salesforce"</li><li><b>b003</b> — Added an "Overage Notifications" section: toggle + email recipient list so account owner(s) get notified when this org exceeds its Project Pool</li><li><b>b002</b> — switched from area-based units to project count (grounded in the real Order Form pricing model); renamed the field to "Project Pool (# of Projects)"; rescaled Acme's numbers to a realistic project count</li><li><b>b001</b> — initial build; split out of feature-provisioning-tab-b024's Contracts tab into its own standalone prototype</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Model a Contract tied to a Salesforce Opportunity (store Opp ID → Project Pool + term); support multiple contracts per org</li>
+      <li>Define how projects-created is computed/rolled up from project activity (1 project = 1 Project Unit, up to 0.5 mi / 20 acres; oversized projects consume more than one)</li>
+      <li>Store both the Salesforce-sourced dates and any admin override (so provenance + reset are possible)</li>
+    </ul></div>
+    <div class="grp"><b>Salesforce sync</b><ul>
+      <li>Look up an Opportunity by ID and pull Project Pool + contract term</li>
+      <li>Map which Salesforce fields feed Project Pool and contract start/end (spike)</li>
+      <li>Keep the pool read-only (Salesforce-sourced) while allowing date overrides — never overwrite the pool on override</li>
+      <li>Re-sync + last-synced provenance; handle Opportunity-not-found / not-yet-linked</li>
+    </ul></div>
+    <div class="grp"><b>Admin: Contracts (per-org)</b><ul>
+      <li>Add Contracts tab to Update Organization Subscription</li>
+      <li>Add Contract selector + "Link new contract from Salesforce"</li>
+      <li>Opportunity lookup UI; read-only pool display + editable date-override fields with "overridden" state + reset</li>
+      <li>Current-status readout (projects created / pool / remaining / term)</li>
+      <li>Overage Notifications section: enable/disable toggle + recipient list (add/remove emails)</li>
+      <li>Persist + save Contracts tab (dirty state, confirmation) — including notification settings</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app</b><ul>
+      <li>Feed the saved pool + term into the org's customer-facing Usage view</li>
+      <li>Surface remaining pool on project create</li>
+      <li>Detect when an org's project count crosses its Project Pool (the trigger for the email below)</li>
+      <li>Wire a Knock workflow + email template for the pool-exceeded notification; send to the saved recipient list</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li><b>Reconcile with the delivery app</b> — CS flagged that a lot of this usage tracking already exists in the delivery app and should <i>move</i> to this surface, not be duplicated; scope the migration before building <span class="note">(CS, Jul 21)</span></li>
+      <li>Decided b004: contract setup is Salesforce-driven — pool + term come from the Opportunity (no freeform); dates are an override for the utility early-load case <span class="note">(CS, Jul 21)</span></li>
+      <li>Decided b002: pool denominated in Project Units (project count), grounded in the real Order Form pricing model — not raw acreage/mileage, not committed $ <span class="note">(PM)</span></li>
+      <li>Decided b003: overage gets an email notification to account owner(s) — notification only, not billing; the pool doesn't hard-stop project creation <span class="note">(PM)</span></li>
+      <li>Overage <i>billing</i> still not modeled — real contracts already price per-project overage, but charging for it is separate from notifying <span class="note">(see Jan 2026 Order Form)</span></li>
+      <li>Are "account owner(s)" the customer's own billing contact, or CivilGrid's internal AE/CSM? Recipient list is free-text either way — confirm who gets this email <span class="note">(open)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<!-- Top nav -->
+<nav class="top-nav">
+  <div class="nav-left">
+    <span class="wordmark">CIVILGRID</span>
+    <span class="nav-admin">Admin <span style="font-size:10px;color:#888c90;">▾</span></span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-icon nav-badge">🔔</span>
+    <span class="nav-icon">?</span>
+    <span class="avatar">NS</span>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- Left nav -->
+  <aside class="left-nav">
+    <div class="home-link"><span>←</span><span>Home</span></div>
+    <div class="nav-section">
+      <div class="nav-section-title">Projects</div>
+      <div class="nav-item">Transactions</div>
+      <div class="nav-item">Move Project</div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">Organizations</div>
+      <div class="nav-item">Create Organization</div>
+      <div class="nav-item">Create Sandbox Org</div>
+      <div class="nav-item">Manage Project Billing</div>
+      <div class="nav-item active">Update Organization Subscription</div>
+      <div class="nav-item">Join Org</div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">Users</div>
+      <div class="nav-item">Unapproved Users</div>
+      <div class="nav-item">Pre-Approved Domains</div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">CivilSearch</div>
+      <div class="nav-item">Civil Searchers</div>
+      <div class="nav-item">Data Requests</div>
+      <div class="nav-item">Agencies</div>
+      <div class="nav-item">Projects</div>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <main class="content">
+    <h1 class="page-title">Update Organization Subscription</h1>
+
+    <div class="field-label">Select Organization</div>
+    <div class="org-select-row">
+      <span class="lbl">Organization:</span>
+      <span class="org-select">Acme, Inc. Organization <span class="chev">▾</span></span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab" id="tab-pricing" onclick="switchTab('pricing')">Pricing</div>
+      <div class="tab" id="tab-prov" onclick="switchTab('prov')">Feature Provisioning</div>
+      <div class="tab active" id="tab-contracts" onclick="switchTab('contracts')">Contracts</div>
+    </div>
+
+    <!-- Pricing stub -->
+    <div class="stub" id="panel-pricing">
+      The existing pricing form (Project Lite Pricing, Project Pricing, unit costs…) lives here — stubbed out in this prototype to keep the focus on Contracts.
+    </div>
+
+    <!-- Feature Provisioning stub -->
+    <div class="stub" id="panel-prov">
+      The Feature Provisioning tab (features × tiers matrix, per-org overrides) lives here — see feature-provisioning-tab-b025.html for that prototype — stubbed out here to keep the focus on Contracts.
+    </div>
+
+    <!-- Contracts -->
+    <div class="panel show" id="panel-contracts">
+      <div class="org-intro">
+        Contracts are <b>linked to Salesforce</b>. Pick the org's contract (or link a new one), then pull the <b>Project Pool</b> and term straight from the Opportunity — no freeform entry, so what's set here always matches what was sold. Denominated in <b>Project Units</b> — one project up to 0.5 mi (linear) or 20 acres (area). This is what the org's customer-facing <b>Usage</b> view reads from.
+      </div>
+
+      <!-- Linked contract selector — an org can hold multiple contracts, each tied to one Opportunity -->
+      <div class="contract-picker-row">
+        <span class="lbl">Contract:</span>
+        <div class="mini-select" id="contract-select" onclick="toggleContractMenu(event)">
+          <span id="contract-label">2026 Annual Program — Opp #0061N00000AbCdE</span>
+          <span class="chev">▾</span>
+          <div class="mini-menu" id="contract-menu">
+            <div class="mini-item active" data-key="a" onclick="pickContract('a', event)">2026 Annual Program — Opp #0061N00000AbCdE</div>
+            <div class="mini-item" data-key="b" onclick="pickContract('b', event)">2025 Pilot — Opp #0061N00000Xy9Zq</div>
+            <div class="mini-sep"></div>
+            <div class="mini-item add" onclick="linkNew(event)">+ Link new contract from Salesforce</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="contract-current">
+        <div class="cc-stat"><span class="cc-label">Projects created</span><span class="cc-value" id="cc-used">42</span></div>
+        <div class="cc-stat"><span class="cc-label">Project pool</span><span class="cc-value" id="cc-pool">100</span></div>
+        <div class="cc-stat"><span class="cc-label">Remaining</span><span class="cc-value" id="cc-remaining">58</span></div>
+        <div class="cc-stat"><span class="cc-label">Term</span><span class="cc-value text" id="cc-term">Jan 1 – Dec 31, 2026</span></div>
+      </div>
+      <div class="org-actionbar">
+        <span class="override-summary none" id="contracts-summary">No changes yet.</span>
+        <div class="save-cluster">
+          <span class="dirty-note" id="dirty-contracts"></span>
+          <button class="btn btn-primary" onclick="saveContracts()">Save</button>
+        </div>
+      </div>
+
+      <!-- Salesforce-linked contract setup -->
+      <div class="sf-block">
+        <div class="sf-head">
+          <span class="sf-title">Salesforce Opportunity <span class="sf-cloud">Salesforce</span></span>
+          <span class="sf-provenance" id="sf-provenance">Synced Jul 22, 2026 · <a class="sf-link" onclick="resync()">Re-sync</a></span>
+        </div>
+        <div class="sf-lookup">
+          <div class="cf-field" style="flex:1;">
+            <label for="sf-opp">Opportunity ID</label>
+            <input type="text" id="sf-opp" value="0061N00000AbCdE" oninput="onOppEdit()" />
+          </div>
+          <button class="btn btn-secondary" onclick="lookupOpp()">Look up</button>
+        </div>
+        <div class="sf-hint" id="sf-hint"></div>
+
+        <div class="sf-synced" id="sf-synced">
+          <div class="sf-grid">
+            <div class="sf-cell">
+              <span class="sf-cell-label">Opportunity</span>
+              <span class="sf-cell-value"><span id="sf-oppname">2026 Annual Program</span> <span class="sf-tag">from Salesforce</span></span>
+            </div>
+            <div class="sf-cell">
+              <span class="sf-cell-label">Project Pool (# of Projects)</span>
+              <span class="sf-cell-value"><b id="sf-pool">100</b> Project Units <span class="sf-tag">from Salesforce</span></span>
+            </div>
+          </div>
+          <div class="sf-dates">
+            <div class="cf-field">
+              <label for="cf-start">Contract Start <span class="ovr-tag" id="ovr-start" style="display:none">overridden</span></label>
+              <input type="date" id="cf-start" value="2026-01-01" oninput="onDateEdit()" />
+            </div>
+            <div class="cf-field">
+              <label for="cf-end">Contract End <span class="ovr-tag" id="ovr-end" style="display:none">overridden</span></label>
+              <input type="date" id="cf-end" value="2026-12-31" oninput="onDateEdit()" />
+            </div>
+            <a class="sf-link reset" id="reset-dates" style="display:none" onclick="resetDates()">Reset to Salesforce dates</a>
+          </div>
+          <div class="sf-edge">
+            <b>Utility edge case:</b> projects are sometimes loaded and initiated <i>before</i> the contract start date. The pool always comes from Salesforce, but you can override the dates above to cover early-loaded projects — the pool is never affected.
+          </div>
+        </div>
+      </div>
+
+      <div class="notify-block">
+        <div class="notify-title">Overage Notifications</div>
+        <label class="notify-toggle">
+          <input type="checkbox" id="cn-enabled" checked onchange="toggleNotify()">
+          <span>Notify account owner(s) by email when this org exceeds its Project Pool</span>
+        </label>
+        <div class="notify-body" id="notify-body">
+          <div class="notify-recipients" id="notify-recipients">
+            <div class="notify-row">
+              <input type="email" class="notify-email" value="billing@acmeinc.com" oninput="onContractsChange()">
+              <button class="notify-remove" onclick="removeRecipient(this)" title="Remove recipient">&times;</button>
+            </div>
+          </div>
+          <button class="notify-add" onclick="addRecipient()">+ Add recipient</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Feedback modal -->
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+// ===== Build / version stamp =====
+const BUILD = 4;
+const BUILD_DATE = "Jul 22, 2026";
+const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+// ===== Tab switching =====
+function switchTab(which) {
+  document.getElementById("tab-pricing").classList.toggle("active", which === "pricing");
+  document.getElementById("tab-prov").classList.toggle("active", which === "prov");
+  document.getElementById("tab-contracts").classList.toggle("active", which === "contracts");
+  document.getElementById("panel-pricing").classList.toggle("show", which === "pricing");
+  document.getElementById("panel-prov").classList.toggle("show", which === "prov");
+  document.getElementById("panel-contracts").classList.toggle("show", which === "contracts");
+  window.__activeScreen = which === "contracts" ? "Contracts" : which === "prov" ? "Feature Provisioning (stub)" : "Pricing (stub)";
+}
+
+// ===== Contracts — Acme, Inc. Organization (Salesforce-linked) =====
+// Contracts now come from Salesforce Opportunities. Pool is read-only (Salesforce-sourced);
+// dates default from Salesforce but can be overridden (utility early-load edge case). `used` is a
+// fixed read-only fact per contract (would come from the usage rollup). pool is a project count
+// (Project Units), not area/acreage — see the b002 changelog. "Look up" loads canned data here.
+const CONTRACTS = {
+  a: { opp: "0061N00000AbCdE", name: "2026 Annual Program", pool: 100, used: 42, start: "2026-01-01", end: "2026-12-31" },
+  b: { opp: "0061N00000Xy9Zq", name: "2025 Pilot",          pool: 40,  used: 39, start: "2025-01-01", end: "2025-12-31" },
+};
+let activeKey = "a";
+
+function fmtDate(iso) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+function renderContractsStatus() {
+  const c = CONTRACTS[activeKey];
+  const start = document.getElementById("cf-start").value;
+  const end = document.getElementById("cf-end").value;
+  document.getElementById("cc-used").textContent = c.used.toLocaleString();
+  document.getElementById("cc-pool").textContent = c.pool.toLocaleString();
+  document.getElementById("cc-remaining").textContent = (c.pool - c.used).toLocaleString();
+  document.getElementById("cc-term").textContent = fmtDate(start) + " – " + fmtDate(end);
+}
+function markDirty(msg) {
+  document.getElementById("dirty-contracts").textContent = "Unsaved changes";
+  const el = document.getElementById("contracts-summary");
+  el.className = "override-summary";
+  el.textContent = msg;
+}
+function clearDirty(msg) {
+  document.getElementById("dirty-contracts").textContent = "";
+  const el = document.getElementById("contracts-summary");
+  el.className = "override-summary none";
+  el.textContent = msg || "No changes yet.";
+}
+// generic change hook used by the Overage Notifications inputs
+function onContractsChange() { markDirty("Editing this org's contract settings."); }
+
+// Load a contract's Salesforce values into the form (pool read-only; dates default from SF)
+function loadContract(key, dirtyMsg) {
+  activeKey = key;
+  const c = CONTRACTS[key];
+  document.getElementById("contract-label").textContent = c.name + " — Opp #" + c.opp;
+  document.getElementById("sf-opp").value = c.opp;
+  document.getElementById("sf-oppname").textContent = c.name;
+  document.getElementById("sf-pool").textContent = c.pool.toLocaleString();
+  document.getElementById("cf-start").value = c.start;
+  document.getElementById("cf-end").value = c.end;
+  document.getElementById("ovr-start").style.display = "none";
+  document.getElementById("ovr-end").style.display = "none";
+  document.getElementById("reset-dates").style.display = "none";
+  document.getElementById("sf-hint").textContent = "";
+  document.querySelectorAll("#contract-menu .mini-item[data-key]").forEach(it =>
+    it.classList.toggle("active", it.dataset.key === key));
+  renderContractsStatus();
+  if (dirtyMsg) markDirty(dirtyMsg); else clearDirty();
+}
+
+// Contract selector dropdown
+function toggleContractMenu(e) {
+  if (e) e.stopPropagation();
+  document.getElementById("contract-menu").classList.toggle("open");
+}
+function pickContract(key, e) {
+  if (e) e.stopPropagation();
+  document.getElementById("contract-menu").classList.remove("open");
+  loadContract(key);
+}
+function linkNew(e) {
+  if (e) e.stopPropagation();
+  document.getElementById("contract-menu").classList.remove("open");
+  document.getElementById("sf-opp").value = "";
+  document.getElementById("sf-opp").focus();
+  document.getElementById("sf-hint").textContent = "Enter the new Opportunity ID and press Look up to pull its pool and term.";
+}
+document.addEventListener("click", () => document.getElementById("contract-menu").classList.remove("open"));
+
+// Salesforce lookup — match the typed Opp ID to a contract and load it
+function lookupOpp() {
+  const val = document.getElementById("sf-opp").value.trim().toLowerCase();
+  const key = Object.keys(CONTRACTS).find(k => CONTRACTS[k].opp.toLowerCase() === val);
+  if (key) loadContract(key, "Loaded contract from Salesforce Opportunity #" + CONTRACTS[key].opp + ".");
+  else document.getElementById("sf-hint").textContent = "No matching Opportunity found — check the ID. (Try 0061N00000AbCdE or 0061N00000Xy9Zq.)";
+}
+function onOppEdit() {
+  document.getElementById("sf-hint").textContent = "Press Look up to pull the pool and term from Salesforce.";
+}
+function resync() {
+  loadContract(activeKey, "Re-synced from Salesforce — pool and term refreshed.");
+}
+
+// Date override — compare to the Salesforce baseline for the active contract
+function onDateEdit() {
+  const c = CONTRACTS[activeKey];
+  const sOvr = document.getElementById("cf-start").value !== c.start;
+  const eOvr = document.getElementById("cf-end").value !== c.end;
+  document.getElementById("ovr-start").style.display = sOvr ? "inline-block" : "none";
+  document.getElementById("ovr-end").style.display = eOvr ? "inline-block" : "none";
+  document.getElementById("reset-dates").style.display = (sOvr || eOvr) ? "inline" : "none";
+  renderContractsStatus();
+  markDirty(sOvr || eOvr ? "Overriding the Salesforce contract dates for this org." : "Editing this org's contract settings.");
+}
+function resetDates() {
+  const c = CONTRACTS[activeKey];
+  document.getElementById("cf-start").value = c.start;
+  document.getElementById("cf-end").value = c.end;
+  onDateEdit();
+}
+
+function saveContracts() {
+  clearDirty("Saved — this org's Usage view now reflects this contract (pool from Salesforce, dates as set).");
+}
+
+// ===== Overage notifications — account owner(s) emailed when this org exceeds its Project Pool =====
+function toggleNotify() {
+  const enabled = document.getElementById("cn-enabled").checked;
+  document.getElementById("notify-body").classList.toggle("disabled", !enabled);
+  onContractsChange();
+}
+function addRecipient() {
+  const wrap = document.getElementById("notify-recipients");
+  const row = document.createElement("div");
+  row.className = "notify-row";
+  row.innerHTML = '<input type="email" class="notify-email" placeholder="name@company.com" oninput="onContractsChange()">' +
+    '<button class="notify-remove" onclick="removeRecipient(this)" title="Remove recipient">&times;</button>';
+  wrap.appendChild(row);
+  onContractsChange();
+}
+function removeRecipient(btn) {
+  btn.parentElement.remove();
+  onContractsChange();
+}
+
+// ===== Info ("About") panel — right-hand pane, mutually exclusive with the feedback pane =====
+function toggleInfo() {
+  const ip = document.getElementById("info-panel");
+  const willOpen = !ip.classList.contains("open");
+  ip.classList.toggle("open");
+  if (willOpen) document.getElementById("fb-pane").classList.remove("open"); // don't stack the two right panes
+}
+
+// ===== Feedback widget — Google Form, prefilled with prototype / build / screen =====
+const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+// File identity is derived from the filename (full basename incl. build, e.g. contract-credits-admin-b001.html)
+// and goes in the Build field — it's the exact-file pointer and can't drift. Prototype stays a friendly description.
+const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+const PROTOTYPE_SLUG = FILE_NAME.replace(/\.html?$/i, "").replace(/-b\d{3,}$/i, "");
+const PROTOTYPE_NAME = PROTOTYPE_SLUG.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase()); // description for the Prototype field; edit for a richer one
+window.__activeScreen = window.__activeScreen || "Contracts";
+function fbUrl(embedded) {
+  const u = new URL(FEEDBACK_FORM_BASE);
+  if (embedded) u.searchParams.set("embedded", "true");
+  u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME); // friendly description
+  u.searchParams.set(FB_ENTRY.build, FILE_NAME);          // filename + build number — the exact file
+  u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+  return u.toString();
+}
+function fbOpen() {
+  document.getElementById("fb-ctx").textContent = PROTOTYPE_NAME + " / " + window.__activeScreen;
+  document.getElementById("fb-frame").src = fbUrl(true);  // lazy-load: only contact Google when opened
+  document.getElementById("fb-newtab").href = fbUrl(false);
+  document.getElementById("info-panel").classList.remove("open"); // don't stack the two right panes
+  document.getElementById("fb-pane").classList.add("open");
+}
+function fbClose() { document.getElementById("fb-pane").classList.remove("open"); }
+document.getElementById("fb-open").onclick = fbOpen;
+document.addEventListener("keydown", e => { if (e.key === "Escape") fbClose(); });
+
+// ===== Init =====
+renderContractsStatus();
+</script>
+</body>
+</html>
