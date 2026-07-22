@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  BUILD b003 · Jul 22, 2026
+  Build history (newest first):
+    b003 · Jul 22, 2026 — dropped the org-wide Layout B entirely (per-role stays the only approach) and
+      removed the per-type description text under Linear/Polygon/Circle — both flagged for removal.
+    b002 · Jul 22, 2026 — removed the "Which project types can this role create?" sub-link, the "New"
+      pill + info tooltip on the Create-projects row, and both circleProjects footnote captions (Layout
+      A and B) — flagged as clutter on the row itself.
+    b001 · Jul 22, 2026 — initial build: a per-role sub-setting under "($) Create new projects" for
+      restricting which project geometry types (Linear / Polygon / Circle) a role can create, staged
+      as two layouts — nested per-role sub-rows (Layout A) vs. a simpler org-wide switch (Layout B).
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roles &amp; Permissions — Project Type Sub-Setting</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Noto Sans", system-ui, -apple-system, sans-serif;
+    background: #ffffff;
+    color: #1d1e20;
+    padding-top: 32px;
+    font-size: 14px;
+  }
+
+  /* ===== Prototype bar ===== */
+  .proto-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    height: 32px; background: #243442;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 16px; gap: 10px; user-select: none;
+  }
+  .proto-badge {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    background: none; padding: 0; color: #f27e31;
+    font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .proto-build {
+    flex-shrink: 0; color: rgba(255,255,255,0.5);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.4px;
+  }
+  .proto-desc {
+    font-size: 12px; color: rgba(255,255,255,0.65);
+    white-space: nowrap; padding: 2px 6px;
+  }
+  .proto-actions {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .proto-about-btn {
+    border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s;
+  }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn {
+    border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s;
+    animation: fbPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes fbPulse {
+    0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); }
+    50%      { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); }
+  }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+  .info-panel {
+    display: none; position: fixed; top: 32px; right: 0;
+    width: 340px; background: #ffffff;
+    border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px;
+    padding: 16px; z-index: 199;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    font-size: 13px; color: #393b3d; line-height: 1.5;
+    max-height: calc(100vh - 40px); overflow-y: auto;
+  }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-section a, .info-panel-link { color: #196fe0; text-decoration: none; font-weight: 600; }
+  .info-panel-section a:hover { text-decoration: underline; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  /* ===== Top nav ===== */
+  .top-nav {
+    position: sticky; top: 32px; z-index: 100;
+    height: 56px; background: #fff;
+    border-bottom: 1px solid #d2d4d7;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+  }
+  .nav-left { display: flex; align-items: center; gap: 10px; }
+  .wordmark { color: #f27e31; font-weight: 800; letter-spacing: 1px; font-size: 20px; }
+  .nav-page { font-size: 14px; font-weight: 500; color: #1d1e20; display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 8px; }
+  .nav-page .chev { color: #888c90; font-size: 10px; }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .nav-icon { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #babdc0; color: #6e7376; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: #243442; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+
+  /* ===== Layout ===== */
+  .layout { display: flex; min-height: calc(100vh - 88px); }
+
+  /* Left nav */
+  .left-nav { width: 224px; flex-shrink: 0; border-right: 1px solid #d2d4d7; background: #fff; padding: 8px; }
+  .home-link { display: flex; align-items: center; gap: 4px; color: #196fe0; font-size: 14px; padding: 4px 8px; margin-bottom: 8px; cursor: pointer; }
+  .home-link:hover span:last-child { text-decoration: underline; }
+  .org-box { border-left: 4px solid #f27e31; background: #fff; padding: 4px 8px; font-weight: 500; font-size: 14px; color: #1d1e20; margin-bottom: 8px; }
+  .nav-divider { height: 1px; background: #d2d4d7; margin: 8px 0; }
+  .nav-section-title { font-size: 16px; font-weight: 500; color: #656e75; padding: 4px 4px; margin-bottom: 2px; }
+  .nav-item { font-size: 14px; color: #1d1e20; padding: 4px 8px; border-radius: 2px; cursor: pointer; }
+  .nav-item:hover { background: #e9eaeb; }
+  .nav-item.active { background: #eaf5ff; color: #134a91; font-weight: 500; }
+
+  /* Content */
+  .content { flex: 1; overflow: auto; }
+  .sections-wrap { display: flex; flex-direction: column; gap: 32px; padding: 8px 8px 80px; }
+  .section-title { font-size: 16px; font-weight: 600; color: #1d1e20; padding: 8px 0 8px 4px; }
+
+  table.perm-table { width: 100%; border-collapse: collapse; }
+  table.perm-table thead th { text-align: left; font-size: 12px; font-weight: 700; color: #1d1e20; padding: 8px 24px 8px 0; white-space: nowrap; }
+  table.perm-table thead th:first-child { padding-left: 4px; }
+  table.perm-table thead th.role-col { text-align: center; padding-left: 0; }
+  table.perm-table tbody tr.row:hover td { background: #fafbfc; }
+  table.perm-table td { padding: 8px 24px 8px 0; font-size: 13px; vertical-align: top; }
+  table.perm-table td:first-child { padding-left: 4px; width: 380px; }
+  table.perm-table td.role-col { text-align: center; padding-top: 10px; }
+
+  .perm-label-row { display: flex; align-items: center; gap: 6px; }
+  .perm-name { color: #1d1e20; }
+  .disclosure-btn { border: none; background: none; cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; color: #54585b; flex-shrink: 0; }
+  .disclosure-chevron { display: inline-block; font-size: 10px; transition: transform 0.1s; }
+  #project-table.panel-open .disclosure-chevron { transform: rotate(90deg); }
+
+  /* info tooltip */
+  .info-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #888c90; color: #888c90; font-size: 9px; font-weight: 600; cursor: help; flex-shrink: 0; }
+  .info-tip:hover .info-tip-bubble, .info-tip:focus .info-tip-bubble { display: block; }
+  .info-tip-bubble { display: none; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #243442; color: #fff; font-size: 11px; font-weight: 400; line-height: 1.4; padding: 8px 10px; border-radius: 6px; width: 240px; z-index: 20; box-shadow: 0 4px 8px rgba(0,0,0,0.12); text-align: left; white-space: normal; }
+
+  /* checkbox */
+  .gc-cb { position: relative; display: inline-flex; width: 16px; height: 16px; border-radius: 4px; border: 1px solid #d2d4d7; box-shadow: 0 1px 2px rgba(0,0,0,0.05); align-items: center; justify-content: center; cursor: pointer; color: #fff; }
+  .gc-cb.checked { background: #243442; border-color: #243442; }
+  .gc-cb.disabled { cursor: not-allowed; opacity: 0.45; }
+  .gc-cb.disabled.checked { background: #e9eaeb; border-color: #d2d4d7; color: #babdc0; }
+
+  /* nested per-role sub-rows */
+  tr.types-expansion { display: none; }
+  #project-table.panel-open tr.types-expansion { display: table-row; }
+
+  tr.type-subrow td { background: #fafbfc; padding-top: 8px; padding-bottom: 8px; }
+  .sub-name-block { padding-left: 40px; }
+  .sub-name { font-size: 13px; color: #1d1e20; font-weight: 500; }
+
+  /* toast */
+  .toast-wrap { position: fixed; top: 44px; right: 16px; z-index: 250; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { background: #fff; border: 1px solid #d2d4d7; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.12); padding: 10px 14px; font-size: 13px; color: #1d1e20; min-width: 220px; opacity: 0; transform: translateY(-8px); transition: opacity 0.15s, transform 0.15s; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast-title { font-weight: 600; margin-bottom: 2px; }
+
+  /* feedback pane */
+  .fb-pane {
+    display: none; position: fixed; top: 32px; right: 0; bottom: 0;
+    width: 440px; max-width: 92vw; background: #fff;
+    border-left: 1px solid #d2d4d7;
+    box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199;
+    flex-direction: column; overflow: hidden;
+  }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Roles &amp; Permissions — Project Type Sub-Setting</span>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Roles &amp; Permissions — Project Type Sub-Setting</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>A customer flagged wanting to stop staff from creating Polygon projects — they think in linear feet, and acres confuse the team. This is a per-role sub-setting under "Create new projects" to restrict which project types a role can create. (Customer Slack thread, 7/22.)</p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li>The new disclosure on "($) Create new projects" nests Linear / Polygon / Circle — the real project geometry types from the New Project flow, not invented names.</li>
+    <li>Per-role sub-rows: a role's type checkboxes grey out automatically when that role's "Create new projects" is off — nothing to restrict by type if a role can't create at all.</li>
+    <li>Org-wide-only was considered (the customer's fallback ask) and ruled out — this stays per-role.</li>
+    <li>Circle is already gated today by an existing org feature flag (<code>circleProjects</code>) — a wrinkle to reconcile before shipping.</li>
+    <li>Expanded by default here so the concept reads immediately in a walkthrough; per the "calm by default" design principle, production would likely default this row collapsed.</li>
+  </ul></div>
+  <div class="info-panel-section"><strong>Not real yet</strong><p>No persistence — toggles reset on reload. Nothing else in the app reads this yet; the New Project flow doesn't enforce it.</p></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b003</b> — dropped Layout B (org-wide) entirely; removed the per-type description text</li><li><b>b002</b> — removed the sub-link, the New pill + tooltip on the Create-projects row, and both circleProjects footnotes (row-level clutter)</li><li><b>b001</b> — initial build</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Add per-role project-type allowlist to the Role schema (Linear / Polygon / Circle)</li>
+      <li>Define resolution when a role's "Create new projects" is off (allowlist is moot, not deleted)</li>
+      <li>Reconcile with the existing <code>circleProjects</code> org feature flag</li>
+    </ul></div>
+    <div class="grp"><b>Admin UI</b><ul>
+      <li>Add disclosure + sub-rows to the Roles &amp; Permissions "Create new projects" row</li>
+      <li>Wire sub-checkbox disabled state to the parent checkbox per role</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app</b><ul>
+      <li>Gate the Linear / Polygon / Circle buttons in SelectProjectType.tsx by the resolved allowlist</li>
+      <li>Gate the KMZ upload path's implicit Polygon/Linear result the same way</li>
+      <li>Decide messaging when a blocked type is hidden vs. shown-disabled</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Does this replace or sit alongside the <code>circleProjects</code> feature flag? <span class="note">(eng)</span></li>
+      <li>Confirm no other project types are planned that would need the same gate <span class="note">(product)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<!-- Top nav -->
+<nav class="top-nav">
+  <div class="nav-left">
+    <span class="wordmark">CIVILGRID</span>
+    <span class="nav-page">Settings <span class="chev">▾</span></span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-icon">🔔</span>
+    <span class="nav-icon">?</span>
+    <span class="avatar">NS</span>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- Left nav -->
+  <aside class="left-nav">
+    <div class="home-link"><span>←</span><span>Home</span></div>
+    <div class="org-box">Demo Org (Staging)</div>
+    <div class="nav-divider"></div>
+    <div class="nav-item">General</div>
+    <div class="nav-item">Plan</div>
+    <div class="nav-item">Billing</div>
+    <div class="nav-divider"></div>
+    <div class="nav-section-title">Team</div>
+    <div class="nav-item">Members</div>
+    <div class="nav-item active">Roles &amp; Permissions</div>
+  </aside>
+
+  <!-- Content -->
+  <main class="content">
+    <div class="sections-wrap" id="sections-wrap"></div>
+  </main>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+// ===== Build / version stamp =====
+const BUILD = 3;
+const BUILD_DATE = "Jul 22, 2026";
+document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+// ===== Data model =====
+const ROLES = [
+  { id: "orgAdmin",   name: "Org Admin" },
+  { id: "viewOnly",   name: "View-only" },
+  { id: "contractor", name: "Contractor" },
+  { id: "pm",         name: "Project Manager" },
+  { id: "engineer",   name: "Engineer/Staff" },
+];
+
+const PROJECT_TYPES = [
+  { id: "linear",  label: "Linear" },
+  { id: "polygon", label: "Polygon" },
+  { id: "circle",  label: "Circle" },
+];
+
+const SECTIONS = [
+  { name: "Organization", actions: [
+    { id: "viewOrgSettings",        label: "View organization settings",                roles: { orgAdmin: true } },
+    { id: "viewSubscriptionInfo",   label: "View subscription information",             roles: { orgAdmin: true } },
+    { id: "inviteOrgMembers",       label: "Invite organization members",               desc: "Can invite new members to same or lower role level", roles: { orgAdmin: true, pm: true } },
+    { id: "updateOrgRoles",         label: "Update member roles",                       desc: "Can update to same or lower role level", roles: { orgAdmin: true, pm: true } },
+    { id: "updateOrgPermissions",   label: "Update granular permissions of roles",      roles: { orgAdmin: true } },
+    { id: "removeOrgMember",        label: "Remove member",                             roles: { orgAdmin: true } },
+    { id: "updateCompanyLogo",      label: "Update Logo",                               roles: { orgAdmin: true, pm: true } },
+    { id: "viewOrgTransactions",    label: "($) View Transactions",                     roles: { orgAdmin: true, pm: true } },
+  ]},
+  { name: "Project", actions: [
+    { id: "createProject",         label: "($) Create new projects",         desc: "Create new project or upgrade project. Members without this permission can create drafts.", roles: { orgAdmin: true, pm: true }, hasTypesPanel: true },
+    { id: "viewAllProjects",       label: "View all projects",               roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "viewProjectDetails",    label: "View project details",            roles: { orgAdmin: true, viewOnly: true, contractor: true, pm: true, engineer: true } },
+    { id: "editProjectDetails",    label: "Edit project details",            roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "editProjectBoundary",   label: "($) Edit project boundary",       roles: { orgAdmin: true, pm: true } },
+    { id: "archiveProject",        label: "Mark Complete or Archive Project",roles: { orgAdmin: true, pm: true } },
+    { id: "updateProjectPM",       label: "Update project PM",               roles: { orgAdmin: true, pm: true } },
+    { id: "addProjectMember",      label: "Add member to project",           roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "removeProjectMember",   label: "Remove member from project",      roles: { orgAdmin: true, pm: true } },
+    { id: "viewProjectTransactions",label: "($) View project Billing info",  roles: { orgAdmin: true, pm: true } },
+    { id: "addProjectFile",        label: "Add files",                       roles: { orgAdmin: true, pm: true, engineer: true, contractor: true } },
+    { id: "updateProjectFile",     label: "Update files",                    desc: "Update other users files in project", roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "deleteProjectFile",     label: "Delete files",                    roles: { orgAdmin: true, pm: true } },
+    { id: "addFieldData",          label: "Add field data",                  roles: { orgAdmin: true, pm: true, engineer: true, contractor: true } },
+    { id: "updateFieldData",       label: "Update field data",               desc: "Update other users field data in project", roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "deleteFieldData",       label: "Delete field data",               roles: { orgAdmin: true, pm: true } },
+    { id: "orderFreeReports",      label: "Order free reports",              roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "orderPaidReports",      label: "($) Order paid reports",          roles: { orgAdmin: true, pm: true } },
+    { id: "downloadData",          label: "Download data",                   roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "requestMaps",           label: "Request data (records research)", roles: { orgAdmin: true, pm: true } },
+    { id: "exportOutreachLog",     label: "Export outreach log",             roles: { orgAdmin: true, pm: true } },
+    { id: "viewCivilDraw",         label: "View all CivilDraw drawings",     roles: { orgAdmin: true, viewOnly: true, pm: true, engineer: true } },
+    { id: "createCivilDraw",       label: "Create CivilDraw drawing",        roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "editCivilDraw",         label: "Edit CivilDraw drawings",         roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "deleteCivilDraw",       label: "Delete CivilDraw drawings",       roles: { orgAdmin: true, pm: true } },
+    { id: "commentCivilDraw",      label: "Comment on CivilDraw drawings",   roles: { orgAdmin: true, viewOnly: true, contractor: true, pm: true, engineer: true } },
+  ]},
+  { name: "Mobile", actions: [
+    { id: "mobileViewAssets", label: "View mobile assets", roles: { orgAdmin: true, contractor: true, pm: true, engineer: true } },
+    { id: "mobileAddData",    label: "Add field data",     roles: { orgAdmin: true, contractor: true, pm: true, engineer: true } },
+    { id: "mobileEditData",   label: "Edit field data",    desc: "Update other users field data", roles: { orgAdmin: true, pm: true, engineer: true } },
+    { id: "mobileDeleteData", label: "Delete field data",  desc: "Update other users field data", roles: { orgAdmin: true, pm: true } },
+  ]},
+];
+
+const CHECK_SVG = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M13.5 4.5L6.5 12L2.5 8.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// ===== State =====
+const roleState = {};       // roleState[actionId][roleId] = bool
+SECTIONS.forEach(section => section.actions.forEach(action => {
+  roleState[action.id] = {};
+  ROLES.forEach(r => { roleState[action.id][r.id] = !!action.roles[r.id]; });
+}));
+
+const typeStateByRole = {}; // typeStateByRole[roleId][typeId] = bool
+ROLES.forEach(r => { typeStateByRole[r.id] = { linear: true, polygon: true, circle: true }; });
+
+let panelOpen = true;
+
+// ===== Render =====
+function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+function cb(checked, disabled, onclickJs, dataAttrs) {
+  const cls = "gc-cb" + (checked ? " checked" : "") + (disabled ? " disabled" : "");
+  const onclick = disabled ? "" : ` onclick="${onclickJs}"`;
+  return `<span class="${cls}"${dataAttrs ? " " + dataAttrs : ""}${onclick}>${checked ? CHECK_SVG : ""}</span>`;
+}
+
+function renderAll() {
+  const wrap = document.getElementById("sections-wrap");
+  wrap.innerHTML = SECTIONS.map(renderSection).join("");
+  const pt = document.getElementById("project-table");
+  pt.classList.toggle("panel-open", panelOpen);
+}
+
+function renderSection(section) {
+  const isProject = section.name === "Project";
+  const tableId = isProject ? ' id="project-table"' : "";
+  return `
+    <div class="section-block">
+      <div class="section-title">${section.name}</div>
+      <table class="perm-table"${tableId}>
+        <thead><tr>
+          <th></th>
+          ${ROLES.map(r => `<th class="role-col">${r.name}</th>`).join("")}
+        </tr></thead>
+        <tbody>${section.actions.map(a => renderActionRows(a)).join("")}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderActionRows(action) {
+  let rows = `<tr class="row" data-action="${action.id}">
+    <td>
+      <div class="perm-label-row">
+        ${action.hasTypesPanel ? `<button class="disclosure-btn" onclick="toggleTypesPanel()" aria-label="Expand project type sub-setting"><span class="disclosure-chevron">&#9656;</span></button>` : ""}
+        <span class="perm-name">${escHtml(action.label)}</span>
+        ${(action.desc && !action.hasTypesPanel) ? `<span class="info-tip">?<span class="info-tip-bubble">${escHtml(action.desc)}</span></span>` : ""}
+      </div>
+    </td>
+    ${ROLES.map(r => `<td class="role-col">${cb(roleState[action.id][r.id], false, `toggleAction('${action.id}','${r.id}','${escJs(r.name)}')`)}</td>`).join("")}
+  </tr>`;
+
+  if (action.hasTypesPanel) {
+    // nested per-role sub-rows
+    PROJECT_TYPES.forEach(t => {
+      rows += `<tr class="types-expansion type-subrow" data-type="${t.id}">
+        <td class="sub-name-block"><div class="sub-name">${t.label}</div></td>
+        ${ROLES.map(r => {
+          const disabled = !roleState[action.id][r.id];
+          return `<td class="role-col">${cb(typeStateByRole[r.id][t.id], disabled, `toggleType('${action.id}','${r.id}','${t.id}','${escJs(r.name)}')`, `data-parent="${action.id}" data-role="${r.id}" data-type="${t.id}"`)}</td>`;
+        }).join("")}
+      </tr>`;
+    });
+  }
+  return rows;
+}
+
+function escJs(s) { return String(s).replace(/'/g, "\\'"); }
+
+// ===== Interactions =====
+function toggleAction(actionId, roleId, roleName) {
+  roleState[actionId][roleId] = !roleState[actionId][roleId];
+  renderAll();
+  showToast(`Role <b>${roleName}</b> updated`);
+}
+
+function toggleType(actionId, roleId, typeId, roleName) {
+  if (!roleState[actionId][roleId]) return;
+  typeStateByRole[roleId][typeId] = !typeStateByRole[roleId][typeId];
+  renderAll();
+  showToast(`Role <b>${roleName}</b> updated`);
+}
+
+function toggleTypesPanel() {
+  panelOpen = !panelOpen;
+  renderAll();
+}
+
+function showToast(messageHtml) {
+  const wrap = document.getElementById("toast-wrap");
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<div class="toast-title">Role Updated</div><div>${messageHtml}</div>`;
+  wrap.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("show"));
+  setTimeout(() => { el.classList.remove("show"); setTimeout(() => el.remove(), 200); }, 2200);
+}
+
+// ===== Info ("About") panel =====
+function toggleInfo() {
+  const ip = document.getElementById("info-panel");
+  const willOpen = !ip.classList.contains("open");
+  ip.classList.toggle("open");
+  if (willOpen) document.getElementById("fb-pane").classList.remove("open");
+}
+
+// ===== Feedback widget =====
+const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+const PROTOTYPE_SLUG = FILE_NAME.replace(/\.html?$/i, "").replace(/-b\d{3,}$/i, "");
+const PROTOTYPE_NAME = PROTOTYPE_SLUG.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+window.__activeScreen = window.__activeScreen || PROTOTYPE_NAME;
+function fbUrl(embedded) {
+  const u = new URL(FEEDBACK_FORM_BASE);
+  if (embedded) u.searchParams.set("embedded", "true");
+  u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+  u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+  u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+  return u.toString();
+}
+function fbOpen() {
+  document.getElementById("fb-ctx").textContent = PROTOTYPE_NAME + " / " + window.__activeScreen;
+  document.getElementById("fb-frame").src = fbUrl(true);
+  document.getElementById("fb-newtab").href = fbUrl(false);
+  document.getElementById("info-panel").classList.remove("open");
+  document.getElementById("fb-pane").classList.add("open");
+}
+function fbClose() { document.getElementById("fb-pane").classList.remove("open"); }
+document.getElementById("fb-open").onclick = fbOpen;
+document.addEventListener("keydown", e => { if (e.key === "Escape") fbClose(); });
+
+// ===== Init =====
+renderAll();
+</script>
+</body>
+</html>
