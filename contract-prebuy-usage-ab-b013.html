@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<!--
+  BUILD b013 · Jul 22, 2026
+  Contract Pre-Buy & Usage — customer-facing view of a contract's pre-purchased project pool.
+  (Filename keeps the legacy "-ab" slug so the already-shared -latest link stays continuous, even
+  though the A/B is now resolved to a single layout — see b013.)
+  Build history (newest first):
+    b013 · Jul 22, 2026 — reworked per CS feedback (Jul 21). (1) A/B RESOLVED to Layout A — CS and
+                          Sales both preferred it; Layout B (gauge + trajectory) and the A/B toggle are
+                          removed (B stays in git history). (2) Added a CONTRACT SELECTOR — an org can
+                          hold multiple contracts (each tied to a Salesforce Opportunity); switching
+                          reloads the usage bar, monthly chart, and projects list. (3) Added a PROJECTS
+                          DRILL-DOWN table — the individual projects that make up the used units
+                          (name / division / size / units / created), with oversized projects drawing
+                          more than one unit. (4) Reframed as the org admin's DEFAULT view (Usage pulled
+                          up to a top-level destination, not buried under Settings) — CS: "hidden behind
+                          a lot of clicks." Captured a note from CS that much of this already lives in the
+                          delivery app and should move here, not be duplicated (Decisions & spikes).
+    b012 · Jul 20, 2026 — Layout A's monthly bar chart spanned the full contract term with empty columns.
+    b011 · Jul 20, 2026 — Layout A monthly bar chart re-added; Layout B gauge text moved beside the ring.
+    b010–b001 · Jul 7–20, 2026 — see contract-prebuy-usage-ab-b012 for the full A/B-era history
+                          (de-duplication, project-count metric switch, dollar/pacing removal, initial A/B build).
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contract Pre-Buy &amp; Usage — CivilGrid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=Noto+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#ffffff;
+    --grey-10:#f4f5f5; --grey-20:#e9eaeb; --grey-30:#d2d4d7; --grey-40:#babdc0;
+    --grey-50:#888c90; --grey-60:#6e7376; --grey-70:#54585b; --grey-80:#393b3d; --grey-90:#1d1e20;
+    --blue-10:#eaf5ff; --blue-20:#c0dbfe; --blue-40:#27b4f6; --blue-50:#196fe0; --blue-60:#134a91; --blue-80:#243442; --blue-90:#1f2c38;
+    --orange-50:#f27e31; --orange-60:#da712c; --orange-10:#ffefe5;
+    --green-20:#c8f5d2; --green-60:#0b7a09;
+    --yellow-10:#fffbef; --yellow-20:#ffefbb; --yellow-60:#db9c13;
+    --secondary:#656e75;
+    --brand:#f27e31;
+    --sans:"Noto Sans", system-ui, -apple-system, sans-serif;
+    --mono:"Noto Sans Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: var(--sans); background: var(--grey-10); color: var(--grey-90); padding-top: 32px; -webkit-font-smoothing: antialiased; }
+
+  /* ============ PROTOTYPE BAR ============ */
+  .proto-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 32px; background: #243442; display: flex; align-items: center; justify-content: center; padding: 0 16px; gap: 12px; user-select: none; }
+  .proto-badge { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: none; padding: 0; color: #f27e31; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .proto-center { display: flex; align-items: center; gap: 12px; }
+  .proto-build { flex-shrink: 0; color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  .proto-desc { font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; }
+  .proto-actions { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+  .proto-about-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; animation: fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse { 0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); } 50% { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); } }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+
+  .info-panel { display: none; position: fixed; top: 32px; right: 0; width: 340px; background: #ffffff; border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px; padding: 16px; z-index: 199; box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px; color: #393b3d; line-height: 1.5; max-height: calc(100vh - 40px); overflow-y: auto; }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-section a, .info-panel-link { color: #196fe0; text-decoration: none; font-weight: 600; }
+  .info-panel-section a:hover { text-decoration: underline; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  .fb-pane { display: none; position: fixed; top: 32px; right: 0; bottom: 0; width: 440px; max-width: 92vw; background: #fff; border-left: 1px solid #d2d4d7; box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199; flex-direction: column; overflow: hidden; }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e9eaeb; font-size: 13px; color: #393b3d; flex-shrink: 0; }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+
+  /* ============ TOP NAV ============ */
+  .top-nav { position: sticky; top: 32px; z-index: 100; height: 36px; width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--white); border-bottom: 1px solid var(--grey-30); padding: 0 8px; }
+  .tn-left { display: flex; align-items: center; }
+  .tn-logo { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: var(--brand); text-transform: uppercase; line-height: 1; }
+  .tn-switcher { display: flex; align-items: center; gap: 6px; padding-left: 12px; font-size: 14px; font-weight: 500; color: var(--grey-90); cursor: pointer; }
+  .tn-switcher svg { width: 14px; height: 14px; }
+  .tn-right { display: flex; align-items: center; gap: 8px; }
+  .tn-icon-btn { position: relative; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--blue-80); cursor: pointer; border-radius: 4px; }
+  .tn-icon-btn:hover { background: var(--grey-10); }
+  .tn-icon-btn svg { width: 20px; height: 20px; }
+  .tn-badge { position: absolute; top: -1px; right: -2px; background: var(--brand); color:#fff; font-size: 9px; font-weight: 700; line-height: 1; padding: 2px 3px; border-radius: 8px; min-width: 15px; text-align: center; }
+  .tn-avatar { width: 24px; height: 24px; border-radius: 9999px; background: var(--blue-80); color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+  /* ============ LAYOUT ============ */
+  .app-body { display: flex; flex-direction: row; height: calc(100vh - 32px - 36px); }
+  .left-nav { width: 224px; flex: none; border-right: 1px solid var(--grey-30); background: var(--white); display: flex; flex-direction: column; }
+  .ln-home { display: flex; align-items: center; gap: 4px; margin: 8px 0; padding: 4px 8px; color: var(--blue-50); font-size: 14px; text-decoration: none; }
+  .ln-home svg { width: 16px; height: 16px; }
+  .ln-home span.txt { border-bottom: 1px solid transparent; }
+  .ln-home:hover span.txt { border-bottom-color: var(--blue-50); }
+  .ln-scroll { overflow-y: auto; padding: 8px; padding-bottom: 96px; }
+  .ln-org { margin: -8px 0 16px; border-left: 4px solid var(--brand); background: var(--white); padding: 4px; font-weight: 500; font-size: 14px; color: var(--grey-90); }
+  .ln-divider { margin: 8px 0; height: 1px; background: var(--grey-20); }
+  .ln-section { display: flex; flex-direction: column; gap: 4px; }
+  .ln-section-title { margin: 4px 0; padding: 0 4px; font-weight: 500; font-size: 14px; color: var(--secondary); }
+  .ln-item { display: block; padding: 4px 8px; border-radius: 2px; font-size: 14px; color: var(--grey-90); text-decoration: none; transition: all 0.05s; cursor: pointer; }
+  .ln-item:hover { background: var(--grey-20); }
+  .ln-item.active { background: var(--blue-10); color: var(--blue-60); font-weight: 500; }
+
+  .content { flex: 1; overflow-y: auto; padding: 16px 24px 64px; }
+  .content-col { max-width: 940px; }
+
+  .page-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .page-icon { width: 30px; height: 30px; border-radius: 6px; background: var(--orange-10); color: var(--orange-60); display: flex; align-items: center; justify-content: center; flex: none; }
+  .page-icon svg { width: 18px; height: 18px; }
+  .page-title { font-size: 20px; font-weight: 600; color: var(--grey-90); }
+  .page-sub { font-size: 14px; color: var(--secondary); margin: 0 0 12px 40px; }
+
+  /* prototype annotation — clearly a note about the prototype, not product chrome */
+  .proto-annot { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--grey-60); border: 1px dashed var(--grey-30); border-radius: 6px; padding: 8px 12px; margin: 0 0 22px 40px; max-width: 600px; line-height: 1.5; }
+  .proto-annot b { color: var(--grey-80); }
+
+  .section-title { font-size: 16px; font-weight: 700; color: var(--grey-90); padding-left: 2px; margin: 0 0 12px; }
+  .section { margin-bottom: 32px; }
+  .card { background: var(--white); border: 1px solid var(--grey-30); border-radius: 8px; }
+
+  .unit-note { font-size: 12px; color: var(--grey-60); margin: 14px 0 0; padding: 0 2px; line-height: 1.5; }
+  .unit-note code { font-family: var(--mono); background: var(--grey-10); border: 1px solid var(--grey-20); border-radius: 3px; padding: 1px 5px; font-size: 11px; color: var(--grey-80); }
+
+  /* ===== Contract selector ===== */
+  .contract-picker-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .contract-picker-row .cp-lbl { font-size: 14px; color: var(--grey-70); }
+  .mini-select { position: relative; display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: var(--grey-90); cursor: pointer; border: 1px solid var(--grey-30); border-radius: 4px; padding: 7px 12px; background: var(--white); }
+  .mini-select:hover { border-color: var(--grey-40); }
+  .mini-select .chev { color: var(--grey-50); font-size: 11px; }
+  .cp-status { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; border-radius: 10px; padding: 1px 8px; }
+  .cp-status.active-c { color: var(--green-60); background: #e7f7e9; border: 1px solid var(--green-20); }
+  .cp-status.expired-c { color: var(--grey-60); background: var(--grey-10); border: 1px solid var(--grey-30); }
+  .cp-opp { font-size: 11px; color: var(--grey-50); font-family: var(--mono); }
+  .mini-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 360px; background: var(--white); border: 1px solid var(--grey-30); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.14); z-index: 50; padding: 4px; }
+  .mini-menu.open { display: block; }
+  .mini-item { padding: 8px 10px; border-radius: 3px; font-size: 13px; color: var(--grey-90); cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+  .mini-item:hover { background: var(--grey-20); }
+  .mini-item.active { background: var(--blue-10); color: var(--blue-60); font-weight: 500; }
+  .mini-item .mi-sub { font-size: 11px; color: var(--grey-50); font-family: var(--mono); white-space: nowrap; }
+  .contract-meta { font-size: 13px; color: var(--grey-60); margin: 0 0 22px 2px; }
+  .contract-meta .k { font-family: var(--mono); color: var(--grey-80); }
+
+  /* ===== Usage progress bar ===== */
+  .usage-block { background: var(--white); border: 1px solid var(--grey-30); border-radius: 8px; padding: 20px; }
+  .usage-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .usage-head .lbl { font-size: 14px; font-weight: 500; color: var(--grey-80); }
+  .usage-head .val { font-family: var(--mono); font-size: 14px; color: var(--grey-70); }
+  .usage-track-wrap { position: relative; padding-top: 4px; }
+  .usage-track { height: 14px; border-radius: 9999px; background: var(--grey-20); overflow: hidden; }
+  .usage-legend-row { margin-top: 12px; display: flex; gap: 20px; font-size: 12px; color: var(--grey-60); }
+  .usage-legend-row .k { font-family: var(--mono); color: var(--grey-80); }
+  .usage-fill { height: 100%; border-radius: 9999px; background: linear-gradient(90deg, var(--blue-60), var(--blue-40)); width: 70%; transition: width 0.2s; }
+
+  .chart-card { background: var(--white); border: 1px solid var(--grey-30); border-radius: 8px; padding: 20px 20px 12px; margin-top: 16px; }
+  .chart-area { position: relative; height: 200px; margin-left: 34px; }
+  .chart-gridline { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--grey-20); }
+  .chart-ylabel { position: absolute; left: -34px; transform: translateY(-50%); font-size: 11px; font-family: var(--mono); color: var(--grey-50); width: 28px; text-align: right; }
+  .chart-cols { position: absolute; left: 0; right: 0; bottom: 0; top: 0; display: flex; align-items: flex-end; }
+  .chart-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; position: relative; cursor: pointer; }
+  .chart-col .col-bg { position: absolute; top: -8px; bottom: 0; left: 8px; right: 8px; border-radius: 4px; background: transparent; transition: background 0.08s; z-index: 0; }
+  .chart-col:hover .col-bg { background: var(--grey-10); }
+  .chart-bar { width: 46px; max-width: 60%; border-radius: 3px 3px 0 0; background: var(--blue-50); z-index: 1; }
+  .chart-xlabels { display: flex; margin-left: 34px; margin-top: 8px; }
+  .chart-xlabel { flex: 1; text-align: center; font-size: 12px; color: var(--grey-60); }
+  .chart-tip { position: absolute; display: none; z-index: 5; background: var(--blue-80); color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 12px; line-height: 1.6; box-shadow: 0 4px 12px rgba(0,0,0,0.25); pointer-events: none; white-space: nowrap; }
+  .chart-tip.show { display: block; }
+  .chart-tip b { display: block; margin-bottom: 2px; }
+
+  /* ===== Projects drill-down table ===== */
+  .ptable-wrap { border: 1px solid var(--grey-30); border-radius: 8px; overflow: hidden; background: var(--white); }
+  .ptable-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--grey-20); }
+  .ptable-title { font-size: 14px; font-weight: 600; color: var(--grey-90); }
+  .ptable-count { font-size: 12px; color: var(--grey-60); font-family: var(--mono); }
+  .ptable-scroll { max-height: 372px; overflow-y: auto; }
+  table.ptable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ptable thead th { position: sticky; top: 0; background: var(--grey-10); text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--grey-50); font-weight: 600; padding: 8px 16px; border-bottom: 1px solid var(--grey-20); }
+  .ptable th.num, .ptable td.num { text-align: right; }
+  .ptable tbody td { padding: 9px 16px; border-bottom: 1px solid var(--grey-20); color: var(--grey-90); vertical-align: middle; }
+  .ptable tbody tr:last-child td { border-bottom: none; }
+  .ptable tbody tr:hover { background: var(--grey-10); }
+  .ptable .pname { font-weight: 500; }
+  .ptable .units { font-family: var(--mono); }
+  .ptable .oversized { display: inline-block; margin-left: 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: #8a5a00; background: var(--yellow-10); border: 1px solid var(--yellow-20); border-radius: 8px; padding: 0 6px; }
+  .ptable-foot { padding: 10px 16px; font-size: 12px; color: var(--grey-60); border-top: 1px solid var(--grey-20); background: var(--grey-10); }
+
+  .pylon-bubble { position: fixed; bottom: 20px; left: 20px; width: 52px; height: 52px; border-radius: 9999px; background: var(--brand); box-shadow: 0 3px 10px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 150; }
+  .pylon-bubble svg { width: 24px; height: 24px; color: #fff; }
+  .pylon-bubble:hover { background: var(--orange-60); }
+</style>
+</head>
+<body>
+
+<!-- ============ PROTOTYPE BAR ============ -->
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <div class="proto-center">
+    <span class="proto-desc">Contract Pre-Buy &amp; Usage</span>
+    <span class="proto-build" id="proto-build">BUILD —</span>
+  </div>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Contract Pre-Buy &amp; Usage</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>The customer-facing view of a contract's pre-purchased project pool and how much has been used. An org can hold multiple contracts — <b>pick one to see its stats and the individual projects that consumed the units</b>. Project count only — no pacing, projections, or dollar figures.</p></div>
+  <div class="info-panel-section"><strong>Linear project</strong><p><a href="https://linear.app/civilgrid/project/billing-and-fee-transparency-242e36812556" target="_blank" rel="noopener">Billing &amp; Fee Transparency &#8599;</a></p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li><b>Contract selector (b013).</b> Switch between the org's contracts (each tied to a Salesforce Opportunity) — the usage bar, monthly chart, and projects list all reload per contract.</li>
+    <li><b>Projects drill-down (b013).</b> The individual projects that make up the used units — name, division, size, units, created. Oversized projects (over 0.5 mi / 20 acres) draw more than one unit; those are flagged.</li>
+    <li><b>Placement (b013).</b> Surfaced as the org admin's <b>default view</b>, not buried under Settings &rarr; Usage (CS: "hidden behind a lot of clicks"). See the nav — Usage is a top-level destination.</li>
+    <li><b>Single layout (b013).</b> The old A/B is resolved to <b>Layout A</b> (usage bar + monthly chart) — CS and Sales both preferred it. Layout B (gauge + trajectory) is dropped.</li>
+    <li>The pool is denominated in <b>Project Units (project count)</b> — grounded in CivilGrid's real Order Form pricing (Project Unit = 0.5 mi or 20 acres per project). No utilization %, run rate, projected usage, or dollar figures.</li>
+  </ul></div>
+  <div class="info-panel-section"><strong>Not real yet</strong><p>Ridgeline Utility Partners, its contracts, Opportunity IDs, and every project name are fictional. Contract switching loads canned data; nothing calls the backend. The Feedback button submits to a live Google Form (stamped with prototype + build + which contract you were viewing).</p></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul>
+    <li><b>b013</b> — resolved A/B to Layout A (CS + Sales); added a contract selector (multiple contracts per org, each tied to a Salesforce Opportunity), a projects drill-down table, and reframed as the org admin's default view rather than buried under Settings</li>
+    <li><b>b012</b> — Layout A monthly bar chart spanned the full contract term with empty columns for months with no usage yet</li>
+    <li><b>b011</b> — Layout A monthly bar chart re-added; Layout B gauge text moved beside the ring</li>
+    <li><b>b010–b001</b> — A/B-era history (de-duplication, project-count metric switch, dollar/pacing removal, initial A/B build) — see contract-prebuy-usage-ab-b012 for the full list</li>
+  </ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data model</b><ul>
+      <li>Support multiple contracts per org (each tied to a Salesforce Opportunity), with per-contract pool + term</li>
+      <li>Compute Project Units consumed per project (1 project = 1 unit, up to 0.5 mi / 20 acres; oversized projects consume more than one)</li>
+      <li>Per-contract monthly + used-to-date series for the usage bar and monthly chart</li>
+      <li>Attribute each project to its contract so the drill-down can list "the projects that make up the units"</li>
+    </ul></div>
+    <div class="grp"><b>Customer UI (Org)</b><ul>
+      <li>Surface Usage as a default org-admin destination (top-level), not tucked under Settings</li>
+      <li>Contract selector — switch between the org's contracts</li>
+      <li>Build Layout A: usage bar + monthly bar chart</li>
+      <li>Projects drill-down table (name / division / size / units / created), server-paginated with an oversized flag</li>
+    </ul></div>
+    <div class="grp"><b>Enforcement / in-app</b><ul>
+      <li>Surface remaining pool on project create</li>
+      <li>Notify billing contact at pool thresholds via Knock</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li><b>Reconcile with the delivery app</b> — CS flagged that a lot of this usage tracking already exists in the delivery app and should <i>move</i> to this surface, not be duplicated; scope the migration first <span class="note">(CS, Jul 21)</span></li>
+      <li>Decided b013: A/B resolved to Layout A (bar + monthly chart); Layout B dropped <span class="note">(CS + Sales)</span></li>
+      <li>Decided b013: Usage is the org admin's default view, not buried under Settings <span class="note">(CS, Jul 21)</span></li>
+      <li>Decided: pool denominated in Project Units (project count), grounded in the real Order Form pricing model — not raw acreage/mileage, not committed $ <span class="note">(PM)</span></li>
+      <li>Overage handling (exceeding the pool) not modeled here — real contracts already price per-project overage <span class="note">(see Jan 2026 Order Form)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<!-- ============ TOP NAV ============ -->
+<nav class="top-nav">
+  <div class="tn-left">
+    <span class="tn-logo">CivilGrid</span>
+    <div class="tn-switcher">
+      <span>Ridgeline Utility Partners</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+  </div>
+  <div class="tn-right">
+    <div class="tn-icon-btn" title="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="tn-badge">9+</span>
+    </div>
+    <div class="tn-icon-btn" title="Help">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+    </div>
+    <div class="tn-avatar" title="Nathan Stankowski">NS</div>
+  </div>
+</nav>
+
+<div class="app-body">
+  <!-- ============ LEFT NAV — Usage is a top-level org destination now, not under Settings ============ -->
+  <aside class="left-nav">
+    <a class="ln-home" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      <span class="txt">Home</span>
+    </a>
+    <div class="ln-scroll">
+      <div class="ln-org">Ridgeline Utility Partners</div>
+      <div class="ln-divider"></div>
+      <div class="ln-section">
+        <a class="ln-item active" href="#">Usage</a>
+        <a class="ln-item" href="#">Projects</a>
+      </div>
+      <div class="ln-divider"></div>
+      <div class="ln-section">
+        <div class="ln-section-title">Settings</div>
+        <a class="ln-item" href="#">General</a>
+        <a class="ln-item" href="#">Plan</a>
+        <a class="ln-item" href="#">Billing</a>
+      </div>
+      <div class="ln-divider"></div>
+      <div class="ln-section">
+        <div class="ln-section-title">Team</div>
+        <a class="ln-item" href="#">Members</a>
+        <a class="ln-item" href="#">Roles &amp; Permissions</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ CONTENT ============ -->
+  <main class="content">
+   <div class="content-col">
+    <div class="page-head">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v4h6V3"/><path d="M8 12h8M8 16h5"/></svg>
+      </div>
+      <div class="page-title">Contract Usage</div>
+    </div>
+    <p class="page-sub">Your pre-purchased project pool and how many you've used this contract.</p>
+    <div class="proto-annot"><span>&#128204;</span><span><b>Placement:</b> this is the org admin's default view — surfaced here, not buried under Settings &rarr; Usage (a note from CS). See About for why.</span></div>
+
+    <!-- Contract selector -->
+    <div class="contract-picker-row">
+      <span class="cp-lbl">Contract:</span>
+      <div class="mini-select" id="contract-select" onclick="toggleContractMenu(event)">
+        <span id="cp-label">2026 Annual Program</span>
+        <span class="cp-status active-c" id="cp-status">Active</span>
+        <span class="cp-opp" id="cp-opp">Opp #0061N00000AbCdE</span>
+        <span class="chev">&#9662;</span>
+        <div class="mini-menu" id="contract-menu">
+          <div class="mini-item active" data-key="a" onclick="pickContract('a', event)"><span>2026 Annual Program</span><span class="mi-sub">Active · Opp #0061N00000AbCdE</span></div>
+          <div class="mini-item" data-key="b" onclick="pickContract('b', event)"><span>2025 Pilot</span><span class="mi-sub">Expired · Opp #0061N00000Xy9Zq</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="contract-meta">Term: <span class="k" id="term-sub">Dec 29, 2025 – Dec 28, 2026</span></p>
+
+    <div class="section">
+      <div class="section-title">Project Pre-Purchase</div>
+
+      <div class="usage-block">
+        <div class="usage-head">
+          <span class="lbl">Contract usage</span>
+          <span class="val" id="ub-val">140 / 200 projects</span>
+        </div>
+        <div class="usage-track-wrap">
+          <div class="usage-track"><div class="usage-fill" id="ub-fill"></div></div>
+        </div>
+        <div class="usage-legend-row">
+          <span><span class="k" id="ub-used">140</span> used</span>
+          <span><span class="k" id="ub-remaining">60</span> remaining</span>
+        </div>
+      </div>
+
+      <p class="unit-note">
+        A <b>Project Unit</b> is one project — up to <code>0.5 miles</code> (linear) or <code>20 acres</code> (area). Projects larger than that draw more than one unit. See <b>Billing</b> for your per-tier rates.
+      </p>
+
+      <div class="chart-card">
+        <div class="usage-head" style="margin-bottom:12px"><span class="lbl">Monthly usage</span></div>
+        <div class="chart-area" id="chart-area">
+          <div class="chart-tip" id="chart-tip"></div>
+          <div class="chart-cols" id="chart-cols"></div>
+        </div>
+        <div class="chart-xlabels" id="chart-xlabels"></div>
+      </div>
+    </div>
+
+    <!-- Projects drill-down — the individual projects that make up the used units -->
+    <div class="section">
+      <div class="section-title">Projects in this contract</div>
+      <div class="ptable-wrap">
+        <div class="ptable-head">
+          <span class="ptable-title">Projects consuming this contract's pool</span>
+          <span class="ptable-count" id="pt-count">128 projects · 140 Project Units used</span>
+        </div>
+        <div class="ptable-scroll">
+          <table class="ptable">
+            <thead>
+              <tr>
+                <th>Project Name</th>
+                <th>Division</th>
+                <th>Size</th>
+                <th class="num">Units</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="pt-body"></tbody>
+          </table>
+        </div>
+        <div class="ptable-foot" id="pt-foot">Showing the 18 most recent · + 110 more projects in this contract</div>
+      </div>
+    </div>
+   </div>
+  </main>
+</div>
+
+<div class="pylon-bubble" title="Chat with Support">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z"/></svg>
+</div>
+
+<!-- ============ FEEDBACK PANE ============ -->
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+  /* ===== Build stamp ===== */
+  const BUILD = 13;
+  const BUILD_DATE = "Jul 22, 2026";
+  const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+  document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+  /* ===== About panel ===== */
+  function toggleInfo() {
+    const ip = document.getElementById('info-panel');
+    const willOpen = !ip.classList.contains('open');
+    ip.classList.toggle('open');
+    if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+  }
+
+  /* ===== Feedback (shared Prototype Feedback Google Form) ===== */
+  const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+  const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+  const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+  const PROTOTYPE_NAME = "Contract Pre-Buy & Usage";
+  window.__activeScreen = "Contract Usage";
+  function fbUrl(embedded) {
+    const u = new URL(FEEDBACK_FORM_BASE);
+    if (embedded) u.searchParams.set("embedded", "true");
+    u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+    u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+    u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+    return u.toString();
+  }
+  function fbOpen() {
+    document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+    document.getElementById('fb-frame').src = fbUrl(true);
+    document.getElementById('fb-newtab').href = fbUrl(false);
+    document.getElementById('info-panel').classList.remove('open');
+    document.getElementById('fb-pane').classList.add('open');
+  }
+  function fbClose() { document.getElementById('fb-pane').classList.remove('open'); }
+  document.getElementById('fb-open').onclick = fbOpen;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fbClose(); });
+
+  /* ===== Data — Ridgeline Utility Partners, two contracts (fictional) =====
+     POOL/used are Project Units (project count) — grounded in the real Order Form pricing model
+     (Project Unit = 0.5 mi or 20 acres per project). MONTHLY totals sum to the contract's used count.
+     `projects` is the most-recent slice of the contract's full project list (projectCount total);
+     the drill-down is server-paginated in the real thing, so the visible rows don't sum to `used`. */
+  const CONTRACTS = {
+    a: {
+      name: "2026 Annual Program", opp: "0061N00000AbCdE", status: "Active",
+      termLabel: "Dec 29, 2025 – Dec 28, 2026",
+      pool: 200, used: 140, projectCount: 128,
+      monthly: [
+        { m: "Dec 2025", short: "Dec ’25", total: 0 },
+        { m: "Jan 2026", short: "Jan", total: 18 },
+        { m: "Feb 2026", short: "Feb", total: 23 },
+        { m: "Mar 2026", short: "Mar", total: 26 },
+        { m: "Apr 2026", short: "Apr", total: 20 },
+        { m: "May 2026", short: "May", total: 29 },
+        { m: "Jun 2026", short: "Jun", total: 24 },
+        { m: "Jul 2026", short: "Jul", total: 0 },
+        { m: "Aug 2026", short: "Aug", total: 0 },
+        { m: "Sep 2026", short: "Sep", total: 0 },
+        { m: "Oct 2026", short: "Oct", total: 0 },
+        { m: "Nov 2026", short: "Nov", total: 0 },
+        { m: "Dec 2026", short: "Dec ’26", total: 0 },
+      ],
+      projects: [
+        { name: "Meridian Gas Corridor Assessment", division: "Gas", size: "0.4 mi", units: 1, created: "Jun 24, 2026" },
+        { name: "Lakeshore Power Distribution Survey", division: "Electric", size: "31 ac", units: 2, created: "Jun 18, 2026" },
+        { name: "Cascade Water Main Replacement", division: "Water", size: "0.3 mi", units: 1, created: "Jun 11, 2026" },
+        { name: "Ridgeway Fiber Route Study", division: "Telecom", size: "0.6 mi", units: 2, created: "Jun 3, 2026" },
+        { name: "Summit Substation Expansion", division: "Electric", size: "8 ac", units: 1, created: "May 28, 2026" },
+        { name: "Elkhorn Gas Regulator Upgrade", division: "Gas", size: "5 ac", units: 1, created: "May 21, 2026" },
+        { name: "Harbor Point Land Rights Review", division: "Land Rights", size: "14 ac", units: 1, created: "May 14, 2026" },
+        { name: "Northgate Feeder Reconductoring", division: "Electric", size: "0.5 mi", units: 1, created: "May 6, 2026" },
+        { name: "Brookfield Water Well Field", division: "Water", size: "22 ac", units: 2, created: "Apr 29, 2026" },
+        { name: "Cedar Valley Pipeline Tie-In", division: "Gas", size: "0.2 mi", units: 1, created: "Apr 20, 2026" },
+        { name: "Foxtail Telecom Backhaul", division: "Telecom", size: "0.45 mi", units: 1, created: "Apr 9, 2026" },
+        { name: "Granite Ridge Transmission Line", division: "Electric", size: "41 ac", units: 2, created: "Mar 30, 2026" },
+        { name: "Willowbrook Sewer Assessment", division: "Water", size: "12 ac", units: 1, created: "Mar 19, 2026" },
+        { name: "Sterling Gas Main Extension", division: "Gas", size: "0.35 mi", units: 1, created: "Mar 6, 2026" },
+        { name: "Aspen Grove Land Survey", division: "Land Rights", size: "9 ac", units: 1, created: "Feb 24, 2026" },
+        { name: "Marigold Distribution Study", division: "Electric", size: "6 ac", units: 1, created: "Feb 12, 2026" },
+        { name: "Copperfield Water Reservoir", division: "Water", size: "18 ac", units: 1, created: "Jan 28, 2026" },
+        { name: "Dublin Junction Fiber Loop", division: "Telecom", size: "0.3 mi", units: 1, created: "Jan 15, 2026" },
+      ],
+    },
+    b: {
+      name: "2025 Pilot", opp: "0061N00000Xy9Zq", status: "Expired",
+      termLabel: "Jan 1, 2025 – Dec 31, 2025",
+      pool: 40, used: 38, projectCount: 36,
+      monthly: [
+        { m: "Jan 2025", short: "Jan", total: 2 },
+        { m: "Feb 2025", short: "Feb", total: 3 },
+        { m: "Mar 2025", short: "Mar", total: 4 },
+        { m: "Apr 2025", short: "Apr", total: 3 },
+        { m: "May 2025", short: "May", total: 5 },
+        { m: "Jun 2025", short: "Jun", total: 4 },
+        { m: "Jul 2025", short: "Jul", total: 3 },
+        { m: "Aug 2025", short: "Aug", total: 4 },
+        { m: "Sep 2025", short: "Sep", total: 3 },
+        { m: "Oct 2025", short: "Oct", total: 3 },
+        { m: "Nov 2025", short: "Nov", total: 2 },
+        { m: "Dec 2025", short: "Dec", total: 2 },
+      ],
+      projects: [
+        { name: "Pinecrest Gas Service Study", division: "Gas", size: "0.2 mi", units: 1, created: "Dec 10, 2025" },
+        { name: "Redwood Substation Audit", division: "Electric", size: "4 ac", units: 1, created: "Nov 22, 2025" },
+        { name: "Clearwater Main Survey", division: "Water", size: "0.25 mi", units: 1, created: "Oct 30, 2025" },
+        { name: "Birchwood Fiber Assessment", division: "Telecom", size: "0.3 mi", units: 1, created: "Oct 12, 2025" },
+        { name: "Maple Ridge Land Review", division: "Land Rights", size: "7 ac", units: 1, created: "Sep 24, 2025" },
+        { name: "Thornton Feeder Study", division: "Electric", size: "24 ac", units: 2, created: "Sep 5, 2025" },
+        { name: "Glenwood Gas Regulator", division: "Gas", size: "3 ac", units: 1, created: "Aug 18, 2025" },
+        { name: "Silverlake Water Tie-In", division: "Water", size: "0.15 mi", units: 1, created: "Jul 29, 2025" },
+        { name: "Ashford Telecom Route", division: "Telecom", size: "0.4 mi", units: 1, created: "Jun 30, 2025" },
+        { name: "Hillcrest Distribution Survey", division: "Electric", size: "5 ac", units: 1, created: "May 20, 2025" },
+        { name: "Fairview Pipeline Assessment", division: "Gas", size: "0.3 mi", units: 1, created: "Apr 8, 2025" },
+        { name: "Oakmont Land Survey", division: "Land Rights", size: "11 ac", units: 1, created: "Feb 26, 2025" },
+      ],
+    },
+  };
+  let activeKey = "a";
+
+  /* ===== Contract selector ===== */
+  function toggleContractMenu(e) {
+    if (e) e.stopPropagation();
+    document.getElementById("contract-menu").classList.toggle("open");
+  }
+  function pickContract(key, e) {
+    if (e) e.stopPropagation();
+    document.getElementById("contract-menu").classList.remove("open");
+    loadContract(key);
+  }
+  document.addEventListener("click", () => document.getElementById("contract-menu").classList.remove("open"));
+
+  function loadContract(key) {
+    activeKey = key;
+    const c = CONTRACTS[key];
+    document.getElementById("cp-label").textContent = c.name;
+    document.getElementById("cp-opp").textContent = "Opp #" + c.opp;
+    const pill = document.getElementById("cp-status");
+    pill.textContent = c.status;
+    pill.className = "cp-status " + (c.status === "Active" ? "active-c" : "expired-c");
+    document.getElementById("term-sub").textContent = c.termLabel;
+    document.querySelectorAll("#contract-menu .mini-item[data-key]").forEach(it =>
+      it.classList.toggle("active", it.dataset.key === key));
+    window.__activeScreen = "Usage — " + c.name;
+    renderUsageBar(c);
+    buildBarChart(c);
+    buildProjectsTable(c);
+  }
+
+  /* ===== Usage bar ===== */
+  function renderUsageBar(c) {
+    document.getElementById("ub-val").textContent = c.used + " / " + c.pool + " projects";
+    document.getElementById("ub-fill").style.width = (100 * c.used / c.pool).toFixed(1) + "%";
+    document.getElementById("ub-used").textContent = c.used;
+    document.getElementById("ub-remaining").textContent = (c.pool - c.used);
+  }
+
+  /* ===== Monthly bar chart (total only, no tiers) — Y axis adapts to the contract ===== */
+  const AREA_H = 200;
+  function buildBarChart(c) {
+    const area = document.getElementById("chart-area");
+    area.querySelectorAll(".chart-gridline, .chart-ylabel").forEach(n => n.remove());
+    const cols = document.getElementById("chart-cols"); cols.innerHTML = "";
+    const xlabels = document.getElementById("chart-xlabels"); xlabels.innerHTML = "";
+    const maxV = Math.max.apply(null, c.monthly.map(m => m.total).concat([1]));
+    const step = maxV <= 10 ? 2 : maxV <= 30 ? 10 : 20;
+    const yMax = Math.ceil(maxV / step) * step;
+    const px = v => (v / yMax) * AREA_H;
+    for (let g = 0; g <= yMax; g += step) {
+      const y = AREA_H - px(g);
+      const line = document.createElement("div"); line.className = "chart-gridline"; line.style.top = y + "px"; area.insertBefore(line, cols);
+      const lbl = document.createElement("div"); lbl.className = "chart-ylabel"; lbl.style.top = y + "px"; lbl.textContent = g; area.insertBefore(lbl, cols);
+    }
+    c.monthly.forEach(d => {
+      const col = document.createElement("div"); col.className = "chart-col"; col.innerHTML = '<div class="col-bg"></div>';
+      const bar = document.createElement("div"); bar.className = "chart-bar"; bar.style.height = px(d.total) + "px";
+      col.appendChild(bar);
+      col.addEventListener("mousemove", e => showBarTip(e, d));
+      col.addEventListener("mouseleave", hideBarTip);
+      cols.appendChild(col);
+      const xl = document.createElement("div"); xl.className = "chart-xlabel"; xl.textContent = d.short; xlabels.appendChild(xl);
+    });
+  }
+  function showBarTip(e, d) {
+    const tip = document.getElementById("chart-tip");
+    tip.innerHTML = '<b>' + d.m + '</b>' + d.total + ' project' + (d.total === 1 ? '' : 's');
+    tip.classList.add("show");
+    const rect = document.getElementById("chart-area").getBoundingClientRect();
+    let x = e.clientX - rect.left + 14; if (x + 140 > rect.width) x = e.clientX - rect.left - 140;
+    let y = e.clientY - rect.top - 10; if (y < 0) y = 0;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  function hideBarTip() { document.getElementById("chart-tip").classList.remove("show"); }
+
+  /* ===== Projects drill-down table ===== */
+  function buildProjectsTable(c) {
+    document.getElementById("pt-count").textContent = c.projectCount.toLocaleString() + " projects · " + c.used + " Project Units used";
+    const tb = document.getElementById("pt-body"); tb.innerHTML = "";
+    c.projects.forEach(p => {
+      const tr = document.createElement("tr");
+      const over = p.units > 1 ? ' <span class="oversized">oversized</span>' : '';
+      tr.innerHTML =
+        '<td class="pname">' + p.name + '</td>' +
+        '<td>' + p.division + '</td>' +
+        '<td>' + p.size + '</td>' +
+        '<td class="num units">' + p.units + over + '</td>' +
+        '<td>' + p.created + '</td>';
+      tb.appendChild(tr);
+    });
+    const remaining = c.projectCount - c.projects.length;
+    document.getElementById("pt-foot").textContent =
+      "Showing the " + c.projects.length + " most recent · + " + remaining.toLocaleString() + " more projects in this contract";
+  }
+
+  /* ===== Init ===== */
+  loadContract("a");
+</script>
+</body>
+</html>
