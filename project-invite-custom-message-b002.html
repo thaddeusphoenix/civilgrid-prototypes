@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<!--
+  BUILD b002 · Aug 7, 2026
+  Build history (newest first):
+    b002 · Aug 7, 2026 — fixed missing doctype/html/head/body wrapper (page failed to load without it)
+    b001 · Aug 7, 2026 — initial build
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project Invite — Custom Message</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sans: "Noto Sans", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: #f4f5f5;
+    color: #1d1e20;
+    padding-top: 32px;
+  }
+  a { color: inherit; }
+
+  /* ---------- Prototype bar ---------- */
+  .proto-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    height: 32px; background: #243442;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 16px; gap: 10px; user-select: none;
+  }
+  .proto-badge {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    background: none; padding: 0; color: #f27e31;
+    font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .proto-build {
+    flex-shrink: 0; color: rgba(255,255,255,0.5);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.4px;
+  }
+  .proto-desc {
+    font-size: 12px; color: rgba(255,255,255,0.65);
+    white-space: nowrap; padding: 2px 6px;
+  }
+  .ab-toggle { display:inline-flex; background:rgba(255,255,255,0.12); border-radius:12px; padding:2px; gap:2px; }
+  .ab-btn { border:none; background:transparent; color:rgba(255,255,255,0.7); font-family:var(--sans); font-size:11px; font-weight:600; letter-spacing:0.3px; padding:3px 12px; border-radius:10px; cursor:pointer; transition:all 0.12s; }
+  .ab-btn:hover { color:#fff; }
+  .ab-btn.active { background:#fff; color:#243442; }
+  .proto-actions {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .proto-about-btn {
+    border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s;
+  }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn {
+    border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s;
+    animation: fbPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes fbPulse {
+    0%, 100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); }
+    50%      { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); }
+  }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+
+  .info-panel {
+    display: none; position: fixed; top: 32px; right: 0;
+    width: 340px; background: #ffffff;
+    border: 1px solid #d2d4d7; border-left: none; border-bottom-left-radius: 8px;
+    padding: 16px; z-index: 199;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    font-size: 13px; color: #393b3d; line-height: 1.5;
+    max-height: calc(100vh - 40px); overflow-y: auto;
+  }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: #1d1e20; margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-section a, .info-panel-link { color: #196fe0; text-decoration: none; font-weight: 600; }
+  .info-panel-section a:hover { text-decoration: underline; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid #e9eaeb; padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888c90; font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: #54585b; margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: #888c90; font-style: italic; }
+
+  /* feedback pane */
+  .fb-pane {
+    display: none; position: fixed; top: 32px; right: 0; bottom: 0;
+    width: 440px; max-width: 92vw; background: #fff;
+    border-left: 1px solid #d2d4d7;
+    box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 199;
+    flex-direction: column; overflow: hidden;
+  }
+  .fb-pane.open { display: flex; }
+  .fb-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid #e9eaeb;
+    font-size: 13px; color: #393b3d; flex-shrink: 0;
+  }
+  .fb-head b { color: #1d1e20; }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: #888c90; cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: #1d1e20; }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid #e9eaeb; font-size: 12px; color: #196fe0; text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+
+  /* ---------- Top nav ---------- */
+  .top-nav {
+    position: sticky; top: 32px; z-index: 50;
+    height: 48px; width: 100%; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #d2d4d7; background: #ffffff; padding: 0 8px;
+  }
+  .top-nav .wordmark { font-size: 15px; font-weight: 800; letter-spacing: 1px; color: #f27e31; text-transform: uppercase; margin-right: 12px; }
+  .top-nav .left { display: flex; align-items: center; }
+  .top-nav .crumb { display: flex; align-items: center; font-size: 13px; color: #393b3d; gap: 8px; }
+  .top-nav .crumb .sep { color: #888c90; }
+  .top-nav .right { display: flex; align-items: center; gap: 10px; }
+  .icon-dot {
+    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #54585b; font-size: 14px; cursor: pointer;
+  }
+  .icon-dot:hover { background: #f4f5f5; }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: #243442; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+  }
+
+  /* ---------- Layout shell ---------- */
+  .shell { display: flex; min-height: calc(100vh - 80px); }
+
+  /* ---------- Left nav ---------- */
+  .left-nav {
+    width: 224px; flex-shrink: 0; background: #fff; border-right: 1px solid #d2d4d7;
+    padding: 8px; padding-bottom: 96px;
+  }
+  .ln-home {
+    display: flex; align-items: center; gap: 4px; padding: 4px 8px; margin-bottom: 8px;
+    font-size: 14px; color: #196fe0; cursor: pointer; width: fit-content;
+  }
+  .ln-home:hover span.label { border-bottom: 1px solid #196fe0; }
+  .ln-project-card { display: flex; gap: 4px; padding: 4px; margin-bottom: 8px; }
+  .ln-project-card .bar { width: 4px; border-radius: 4px; background: #fdba74; align-self: stretch; flex-shrink: 0; }
+  .ln-project-card .name { font-size: 15px; font-weight: 500; color: #1d1e20; margin-bottom: 2px; }
+  .ln-project-card .pm { font-size: 12px; color: #1d1e20; margin-bottom: 6px; }
+  .ln-badge { display: inline-flex; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 12px; background: #eaf5ff; color: #134a91; text-transform: capitalize; width: fit-content; }
+  .ln-divider { height: 1px; background: #e9eaeb; margin: 8px 0; }
+  .ln-section-title { font-size: 14px; font-weight: 500; color: #656e75; margin: 4px 0 6px 4px; }
+  .ln-item {
+    display: block; padding: 4px 8px; border-radius: 2px; font-size: 14px; color: #1d1e20;
+    margin-bottom: 4px; cursor: pointer; text-decoration: none;
+  }
+  .ln-item:hover { background: #e9eaeb; }
+  .ln-item.active { background: #eaf5ff; color: #134a91; font-weight: 500; }
+
+  /* ---------- Main content ---------- */
+  .main { flex: 1; padding: 24px 32px; }
+  .main-head { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+  .btn {
+    font-family: var(--sans); font-weight: 500; font-size: 12px; line-height: 20px;
+    border-radius: 6px; cursor: pointer; padding: 4px 8px; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .btn-primary { background: #243442; color: #fff; }
+  .btn-primary:hover { background: #1f2c38; }
+  .btn-secondary { background: #f4f5f5; border-color: #d2d4d7; color: #1f2c38; }
+  .btn-secondary:hover { background: #d2d4d7; }
+  .btn-hollow { background: transparent; color: #1f2c38; }
+  .btn-hollow:hover { background: #e9eaeb; }
+
+  table.members { width: 100%; border-collapse: collapse; }
+  table.members th {
+    text-align: left; font-size: 16px; font-weight: 600; padding: 4px 4px 8px 4px; border-bottom: 1px solid #d2d4d7;
+  }
+  table.members td { padding: 6px 4px; vertical-align: middle; }
+  table.members tr:hover { background: rgba(101,110,117,0.05); }
+  .m-name { font-size: 14px; color: #1d1e20; }
+  .m-email { font-size: 12px; color: #656e75; }
+  .m-tag { font-size: 14px; color: #d3d6d9; text-transform: lowercase; }
+
+  /* ---------- Dialog ---------- */
+  .overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 90;
+  }
+  .overlay.open { display: block; }
+  .dialog {
+    display: none; position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    z-index: 91; width: 600px; max-width: 92vw; max-height: 80vh; overflow: hidden;
+    background: #fff; border: 1px solid #d2d4d7; border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.18);
+    display: none; flex-direction: column;
+  }
+  .dialog.open { display: flex; }
+  .dialog-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; flex-shrink: 0; }
+  .dialog-title { font-size: 18px; font-weight: 600; color: #243442; }
+  .dialog-close { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1f2c38; opacity: 0.7; background: none; border: none; font-size: 18px; }
+  .dialog-close:hover { opacity: 1; }
+  .dialog-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  .dialog-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 16px; flex-shrink: 0; }
+
+  .field-label { font-size: 12px; color: #393b3d; font-weight: 500; }
+  .search-input-wrap { border: 1px solid #d2d4d7; border-radius: 2px; padding: 4px 8px; font-size: 12px; color: #888c90; height: 28px; display: flex; align-items: center; }
+  .helper { font-size: 12px; color: #1d1e20; }
+
+  .grid-head { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: end; }
+  .grid-head .invite-hdr { font-size: 14px; font-weight: 500; line-height: 16px; }
+  .about-roles { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; color: #1d1e20; cursor: pointer; }
+
+  .row-a { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid #f4f5f5; }
+  .row-a:first-of-type { border-top: none; }
+  .row-email { font-size: 12px; color: #393b3d; }
+  .role-select { border: 1px solid #d2d4d7; border-radius: 2px; font-size: 12px; height: 28px; padding: 0 8px; width: 160px; color: #393b3d; background: #fff; }
+  .row-actions { display: flex; align-items: center; justify-content: space-between; }
+  .icon-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 6px; cursor: pointer; color: #656e75; font-size: 13px; }
+  .icon-btn:hover { background: #e9eaeb; }
+  .apply-all { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #393b3d; cursor: pointer; }
+
+  textarea.msg {
+    width: 100%; resize: none; border: 1px solid #d2d4d7; border-radius: 2px; padding: 6px;
+    font-size: 12px; font-family: var(--sans); outline: none; color: #1d1e20;
+  }
+  textarea.msg:focus { border-color: #3b82f6; }
+  textarea.msg::placeholder { color: #888c90; }
+  .msg-help { font-size: 11px; color: #888c90; margin-top: 4px; }
+
+  .note-toggle { font-size: 12px; color: #196fe0; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; }
+  .note-toggle:hover { text-decoration: underline; }
+  .note-box { margin-top: 6px; }
+  .row-b {
+    display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid #f4f5f5;
+  }
+  .row-b:first-of-type { border-top: none; }
+  .row-b-top { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Project Invite — Custom Message</span>
+  <div class="ab-toggle" role="group" aria-label="Layout toggle">
+    <button class="ab-btn active" data-variant="a" onclick="setVariant('a')">Batch message</button>
+    <button class="ab-btn" data-variant="b" onclick="setVariant('b')">Per-recipient note</button>
+  </div>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Project Invite — Custom Message</div>
+  <div class="info-panel-section">
+    <strong>Purpose</strong>
+    <p>Today's "Invite Team Members" dialog has no way to add a personal note — this tests where a custom message should live and whether it applies to the whole invite batch or to each recipient individually.</p>
+  </div>
+  <div class="info-panel-section">
+    <strong>What to notice</strong>
+    <ul>
+      <li>The dialog chrome (search input, role select, About Roles) is the real "Invite Team Members" flow — only the message field is new</li>
+      <li>Use the toggle in the bar above to compare the two placements</li>
+      <li>"Batch message" — one message, sent to everyone in this invite</li>
+      <li>"Per-recipient note" — an optional note per staged email, added inline</li>
+    </ul>
+  </div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b002</b> — fixed missing doctype/html/head/body wrapper</li><li><b>b001</b> — initial build</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>API / data model</b><ul>
+      <li>Add optional batch-level <code>inviteMessage</code> field to the invite payload</li>
+      <li>Add optional per-recipient <code>note</code> field to member invite records</li>
+      <li>Persist message text with the invite so it's visible in send history</li>
+    </ul></div>
+    <div class="grp"><b>Email delivery</b><ul>
+      <li>Render the personal message block in the invite email template</li>
+      <li>Add a character limit and basic spam/profanity guard before send</li>
+      <li>Confirm message renders in plain-text email clients, not just HTML</li>
+    </ul></div>
+    <div class="grp"><b>Invite dialog UI</b><ul>
+      <li>Add message textarea below staged invites (batch layout)</li>
+      <li>Add per-recipient "Add a note" expand/collapse control</li>
+      <li>Keep typed message if the dialog is closed and reopened before sending</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Batch vs. per-recipient message — which reads better at scale? <span class="note">(this prototype)</span></li>
+      <li>Should the message field extend to the bulk multi-project invite flow, or stay single-project only? <span class="note">(open, no Linear project yet)</span></li>
+      <li>Character limit and moderation approach for free-text invite messages <span class="note">(eng/security)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<nav class="top-nav">
+  <div class="left">
+    <span class="wordmark">CIVILGRID</span>
+    <div class="crumb">
+      <span>Nova Ridge Engineering</span>
+      <span class="sep">/</span>
+      <span>Meridian Gas Corridor Assessment</span>
+    </div>
+  </div>
+  <div class="right">
+    <div class="icon-dot" title="Notifications">&#128276;</div>
+    <div class="icon-dot" title="Help">?</div>
+    <div class="avatar">JP</div>
+  </div>
+</nav>
+
+<div class="shell">
+  <div class="left-nav">
+    <div class="ln-home">&#8592; <span class="label">Home</span></div>
+    <div class="ln-project-card">
+      <div class="bar"></div>
+      <div>
+        <div class="name">Meridian Gas Corridor Assessment</div>
+        <div class="pm">PM: J. Park</div>
+        <div class="ln-badge">Project</div>
+      </div>
+    </div>
+    <div class="ln-divider"></div>
+
+    <div class="ln-section-title">General</div>
+    <a class="ln-item">Project Progress</a>
+    <a class="ln-item">Project Info</a>
+    <a class="ln-item active">Team</a>
+    <a class="ln-item">Billing</a>
+    <a class="ln-item">Project Files</a>
+    <a class="ln-item">Downloads</a>
+    <div class="ln-divider"></div>
+
+    <div class="ln-section-title">Analysis</div>
+    <a class="ln-item">Utilities</a>
+    <a class="ln-item">Land Rights</a>
+    <a class="ln-item">Geotechnical</a>
+    <a class="ln-item">Environmental</a>
+    <a class="ln-item">Field Notes</a>
+    <a class="ln-item">Potholing</a>
+    <a class="ln-item">Intelligence</a>
+    <a class="ln-item">Proposal Packet</a>
+  </div>
+
+  <div class="main">
+    <div class="main-head">
+      <button class="btn btn-primary" onclick="openDialog()">Invite Team</button>
+    </div>
+    <table class="members">
+      <thead><tr><th>Members</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="m-name">J. Park <span class="m-tag">(you)</span></div>
+            <div class="m-email">j.park@novaridge-eng.com</div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <div class="m-name">A. Chen</div>
+            <div class="m-email">a.chen@novaridge-eng.com</div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <div class="m-name">M. Rivera</div>
+            <div class="m-email">m.rivera@novaridge-eng.com</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeDialog()"></div>
+<div class="dialog" id="dialog">
+  <div class="dialog-header">
+    <div class="dialog-title">Invite Team Members</div>
+    <button class="dialog-close" onclick="closeDialog()">&times;</button>
+  </div>
+  <div class="dialog-body">
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div class="field-label">Add new members to this project</div>
+      <div class="search-input-wrap">Enter email or search org members</div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div class="helper">Use a name or email address to find users already a part of your organization.</div>
+      <div class="helper">Type a person's email address to invite them to the platform, you can have as many users as you want in your organization.</div>
+    </div>
+
+    <!-- Layout A: one message for the whole batch -->
+    <div id="variant-a">
+      <div class="grid-head" style="margin-bottom:8px;">
+        <div class="invite-hdr">Invite to CivilGrid</div>
+        <div class="about-roles">About Roles <span style="font-size:13px;">&#9432;</span></div>
+        <div></div>
+      </div>
+      <div class="row-a">
+        <div class="row-email">d.oyelaran@fieldworks-partners.com</div>
+        <select class="role-select"><option>Viewer</option><option selected>Editor</option><option>Admin</option></select>
+        <div class="row-actions">
+          <div class="apply-all"><span class="icon-btn" style="width:16px;height:16px;">&#10697;</span> Apply to all</div>
+          <button class="icon-btn">&#128465;</button>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:4px; margin-top:16px;">
+        <div class="field-label">Personal message (optional)</div>
+        <textarea class="msg" rows="4" placeholder="Add a note that's included in the invite email...">Hey Dennis — looping you in on the Meridian Gas Corridor Assessment so you can review the utility conflict findings before Friday's client call. Let me know if you run into access issues.</textarea>
+        <div class="msg-help">Sent to every recipient in this invite.</div>
+      </div>
+    </div>
+
+    <!-- Layout B: a note per recipient -->
+    <div id="variant-b" style="display:none;">
+      <div class="grid-head" style="margin-bottom:8px;">
+        <div class="invite-hdr">Invite to CivilGrid</div>
+        <div class="about-roles">About Roles <span style="font-size:13px;">&#9432;</span></div>
+        <div></div>
+      </div>
+
+      <div class="row-b">
+        <div class="row-b-top">
+          <div class="row-email">d.oyelaran@fieldworks-partners.com</div>
+          <select class="role-select"><option>Viewer</option><option selected>Editor</option><option>Admin</option></select>
+          <div class="row-actions">
+            <div class="apply-all"><span class="icon-btn" style="width:16px;height:16px;">&#10697;</span> Apply to all</div>
+            <button class="icon-btn">&#128465;</button>
+          </div>
+        </div>
+        <div class="note-box">
+          <textarea class="msg" rows="2" placeholder="Add a personal note for this recipient...">Hey Dennis — you're on this one for the utility conflict review ahead of Friday's client call.</textarea>
+        </div>
+      </div>
+
+      <div class="row-b">
+        <div class="row-b-top">
+          <div class="row-email">s.whitfield@fieldworks-partners.com</div>
+          <select class="role-select"><option selected>Viewer</option><option>Editor</option><option>Admin</option></select>
+          <div class="row-actions">
+            <div style="width:16px;"></div>
+            <button class="icon-btn">&#128465;</button>
+          </div>
+        </div>
+        <div class="note-toggle" onclick="this.style.display='none'; this.nextElementSibling.style.display='block';">+ Add a personal note</div>
+        <div class="note-box" style="display:none;">
+          <textarea class="msg" rows="2" placeholder="Add a personal note for this recipient..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dialog-footer">
+    <button class="btn btn-secondary" onclick="closeDialog()">Cancel</button>
+    <button class="btn btn-primary" onclick="closeDialog()">Invite</button>
+  </div>
+</div>
+
+<script>
+  const BUILD = 2;
+  const BUILD_DATE = "Aug 7, 2026";
+  document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+  const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+  const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+  const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+  const PROTOTYPE_SLUG = FILE_NAME.replace(/\.html?$/i, "").replace(/-b\d{3,}$/i, "");
+  const PROTOTYPE_NAME = PROTOTYPE_SLUG.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  window.__activeScreen = "Layout A — Batch message";
+
+  function fbUrl(embedded) {
+    const u = new URL(FEEDBACK_FORM_BASE);
+    if (embedded) u.searchParams.set("embedded", "true");
+    u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+    u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+    u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+    return u.toString();
+  }
+  function fbOpen() {
+    document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+    document.getElementById('fb-frame').src = fbUrl(true);
+    document.getElementById('fb-newtab').href = fbUrl(false);
+    document.getElementById('info-panel').classList.remove('open');
+    document.getElementById('fb-pane').classList.add('open');
+  }
+  function fbClose() { document.getElementById('fb-pane').classList.remove('open'); }
+  document.getElementById('fb-open').onclick = fbOpen;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fbClose(); });
+
+  function toggleInfo() {
+    const ip = document.getElementById('info-panel');
+    const willOpen = !ip.classList.contains('open');
+    ip.classList.toggle('open');
+    if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+  }
+
+  function setVariant(v) {
+    document.getElementById('variant-a').style.display = (v === 'a') ? 'block' : 'none';
+    document.getElementById('variant-b').style.display = (v === 'b') ? 'block' : 'none';
+    document.querySelectorAll('.ab-btn').forEach(b => b.classList.toggle('active', b.dataset.variant === v));
+    window.__activeScreen = (v === 'a') ? 'Layout A — Batch message' : 'Layout B — Per-recipient note';
+  }
+
+  function openDialog() {
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('dialog').classList.add('open');
+  }
+  function closeDialog() {
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('dialog').classList.remove('open');
+  }
+  openDialog();
+</script>
+</body>
+</html>
