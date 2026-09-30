@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  BUILD b001 · Sep 30, 2026
+  Build history (newest first):
+    b001 · Sep 30, 2026 — initial build. Day filter for field notes, two placements toggled from the
+      Prototype bar: A = day chips in the Field Notes tab (list + tab map + export follow the filter);
+      B = day filter on the Field Notes layer in the map's layer picker (works from any tab).
+  To bump: increment BUILD + BUILD_DATE in the <script>, add a line here and to the
+  info-panel "Build history", then rename the file to the new -b###.html (replace; no archiving).
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Notes — Day Filter</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=Noto+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #243442; --primary-dark: #1f2c38; --orange: #f27e31;
+    --grey-10: #f4f5f5; --grey-20: #e9eaeb; --grey-30: #d2d4d7; --grey-40: #babdc0;
+    --grey-50: #888c90; --grey-70: #54585b; --grey-80: #393b3d; --grey-90: #1d1e20;
+    --blue-10: #eaf5ff; --blue-20: #c0dbfe; --blue-40: #27b4f6; --blue-50: #196fe0; --blue-60: #134a91;
+    --warning-bg: #ffefbb; --warning-text: #8a5a00;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08); --shadow-md: 0 4px 8px rgba(0,0,0,0.12);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+    --sans: "Noto Sans", system-ui, -apple-system, sans-serif;
+    --mono: "Noto Sans Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: var(--sans); background: var(--grey-10); color: var(--grey-90); padding-top: 32px; font-size: 14px; }
+  button { font-family: inherit; }
+
+  /* ===== Prototype bar ===== */
+  .proto-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 300; height: 32px; background: var(--primary); display: flex; align-items: center; justify-content: center; padding: 0 16px; gap: 10px; user-select: none; }
+  .proto-badge { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--orange); font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .proto-desc { font-size: 12px; color: rgba(255,255,255,0.65); white-space: nowrap; padding: 2px 6px; }
+  .proto-build { flex-shrink: 0; color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  .ab-toggle { display: inline-flex; background: rgba(255,255,255,0.12); border-radius: 12px; padding: 2px; gap: 2px; }
+  .ab-btn { border: none; background: transparent; color: rgba(255,255,255,0.7); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 10px; cursor: pointer; transition: all 0.12s; }
+  .ab-btn:hover { color: #fff; }
+  .ab-btn.active { background: #fff; color: var(--primary); }
+  .proto-actions { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+  .proto-about-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; }
+  .proto-about-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .proto-fb-btn { border: 1px solid rgba(255,255,255,0.3); background: transparent; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; padding: 3px 12px; border-radius: 12px; cursor: pointer; transition: background 0.12s; animation: fbPulse 1.6s ease-in-out infinite; }
+  @keyframes fbPulse { 0%,100% { background: rgba(242,126,49,0); border-color: rgba(255,255,255,0.3); box-shadow: 0 0 0 0 rgba(242,126,49,0.55); } 50% { background: #f27e31; border-color: #f27e31; box-shadow: 0 0 0 5px rgba(242,126,49,0); } }
+  .proto-fb-btn:hover { animation: none; background: rgba(255,255,255,0.15); }
+  @media (prefers-reduced-motion: reduce) { .proto-fb-btn { animation: none; } }
+
+  /* ===== Info + feedback panes ===== */
+  .info-panel { display: none; position: fixed; top: 32px; right: 0; width: 340px; background: #fff; border: 1px solid var(--grey-30); border-left: none; border-bottom-left-radius: 8px; padding: 16px; z-index: 299; box-shadow: 0 4px 16px rgba(0,0,0,0.15); font-size: 13px; color: var(--grey-80); line-height: 1.5; max-height: calc(100vh - 40px); overflow-y: auto; }
+  .info-panel.open { display: block; }
+  .info-panel-title { font-size: 14px; font-weight: 600; color: var(--grey-90); margin-bottom: 12px; }
+  .info-panel-section { margin-bottom: 10px; }
+  .info-panel-section strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey-50); display: block; margin-bottom: 4px; }
+  .info-panel-section p, .info-panel-section ul { margin: 0; padding: 0; }
+  .info-panel-section ul { padding-left: 16px; }
+  .info-panel-section li { margin-bottom: 3px; }
+  .info-panel-section a, .info-panel-link { color: var(--blue-50); text-decoration: none; font-weight: 600; }
+  .info-panel-section a:hover { text-decoration: underline; }
+  .info-panel-details { margin-top: 12px; border-top: 1px solid var(--grey-20); padding-top: 10px; }
+  .info-panel-details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey-50); font-weight: 700; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .info-panel-details summary::-webkit-details-marker { display: none; }
+  .info-panel-details summary::before { content: "\25B8"; font-size: 9px; transition: transform 0.1s; }
+  .info-panel-details[open] summary::before { transform: rotate(90deg); }
+  .info-panel-details .grp { margin-top: 9px; }
+  .info-panel-details .grp > b { display: block; font-size: 11px; font-weight: 600; color: var(--grey-70); margin-bottom: 3px; }
+  .info-panel-details ul { padding-left: 16px; margin: 0; }
+  .info-panel-details li { margin-bottom: 2px; font-size: 12px; line-height: 1.4; }
+  .info-panel-details .note { color: var(--grey-50); font-style: italic; }
+
+  .fb-pane { display: none; position: fixed; top: 32px; right: 0; bottom: 0; width: 440px; max-width: 92vw; background: #fff; border-left: 1px solid var(--grey-30); box-shadow: -4px 4px 16px rgba(0,0,0,0.15); z-index: 299; flex-direction: column; overflow: hidden; }
+  .fb-pane.open { display: flex; }
+  .fb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--grey-20); font-size: 13px; color: var(--grey-80); flex-shrink: 0; }
+  .fb-head b { color: var(--grey-90); }
+  .fb-close { border: none; background: none; font-size: 20px; line-height: 1; color: var(--grey-50); cursor: pointer; padding: 0 4px; }
+  .fb-close:hover { color: var(--grey-90); }
+  .fb-frame { flex: 1; width: 100%; border: none; }
+  .fb-newtab { display: block; padding: 8px 16px; border-top: 1px solid var(--grey-20); font-size: 12px; color: var(--blue-50); text-decoration: none; flex-shrink: 0; }
+  .fb-newtab:hover { text-decoration: underline; }
+
+  /* ===== Top nav ===== */
+  .top-nav { position: fixed; top: 32px; left: 0; right: 0; z-index: 100; height: 52px; background: #fff; border-bottom: 1px solid var(--grey-30); display: flex; align-items: center; padding: 0 8px; gap: 8px; }
+  .logo { color: var(--orange); font-size: 19px; font-weight: 800; letter-spacing: 1px; width: 144px; padding-left: 6px; }
+  .nav-page { font-size: 14px; color: var(--grey-80); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .chev { font-size: 10px; color: var(--grey-50); }
+  .crumb { position: absolute; left: 50%; transform: translateX(-50%); font-size: 14px; color: var(--grey-90); display: flex; align-items: center; gap: 8px; }
+  .crumb .sep { color: var(--grey-40); }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 14px; padding-right: 8px; }
+  .nav-ico { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--grey-50); color: var(--grey-50); font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .nav-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+
+  /* ===== Shell ===== */
+  .shell { display: flex; position: fixed; top: 84px; left: 0; right: 0; bottom: 0; }
+
+  /* left nav — LeftNav/index.tsx w-56, border-r grey-30; NavItem active bg-blue-10 text-blue-60 */
+  .left-nav { width: 224px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--grey-30); overflow-y: auto; }
+  .ln-back { display: flex; align-items: center; gap: 4px; color: var(--blue-50); font-size: 14px; margin: 8px 0; padding: 4px 8px; cursor: pointer; }
+  .ln-inner { padding: 8px 8px 96px; }
+  .ln-proj { display: flex; gap: 4px; padding: 4px; margin-bottom: 16px; }
+  .ln-proj .bar { width: 4px; flex-shrink: 0; background: #fdba74; border-radius: 9999px; }
+  .ln-proj .lp-name { font-size: 16px; font-weight: 500; color: var(--grey-90); }
+  .ln-proj .lp-pm { font-size: 12px; color: var(--grey-90); margin: 4px 0; }
+  .ln-proj .lp-badge { display: inline-block; font-size: 11px; font-weight: 500; color: var(--warning-text); background: var(--warning-bg); padding: 1px 8px; border-radius: 9999px; }
+  .ln-div { height: 1px; border-bottom: 1px solid var(--grey-20); margin: 8px 0; }
+  .ln-section { font-size: 14px; font-weight: 500; color: #656e75; padding: 4px 8px; }
+  .ln-items { display: flex; flex-direction: column; gap: 4px; }
+  .ln-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 14px; color: var(--grey-90); border-radius: 4px; cursor: pointer; }
+  .ln-item:hover { background: var(--grey-20); }
+  .ln-item.active { background: var(--blue-10); color: var(--blue-60); font-weight: 500; }
+  .ln-beta { font-size: 10px; font-weight: 600; color: var(--grey-80); background: var(--grey-20); padding: 1px 6px; border-radius: 9999px; }
+  .ln-newmap { margin: 6px 8px; padding: 6px; border: 1px solid var(--grey-30); border-radius: 6px; text-align: center; font-size: 13px; color: var(--grey-80); cursor: pointer; }
+
+  /* faux map */
+  .map { flex: 1; position: relative; overflow: hidden; min-width: 0; background: #e8e6df; }
+  .map > svg.base { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .map-btn { position: absolute; background: #fff; border: 1px solid var(--grey-30); border-radius: 4px; box-shadow: var(--shadow-sm); font-size: 13px; color: var(--grey-80); }
+  .map-layers { top: 16px; left: 16px; padding: 6px 12px; display: flex; align-items: center; gap: 7px; cursor: pointer; z-index: 5; }
+  .map-layers:hover { background: var(--grey-10); }
+  .map-tools { right: 16px; top: 16px; display: flex; flex-direction: column; overflow: hidden; }
+  .map-tools div { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--grey-20); color: var(--grey-70); font-size: 14px; }
+  .map-tools div:last-child { border-bottom: none; }
+  .map-attr { position: absolute; bottom: 4px; right: 8px; font-size: 10px; color: var(--grey-70); white-space: nowrap; }
+  .pin { cursor: pointer; }
+  .pin circle { transition: stroke-width .08s; }
+
+  /* map filter indicator (proposed) */
+  .map-pill { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 6; display: none; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--blue-50); border-radius: 9999px; box-shadow: var(--shadow-md); padding: 5px 6px 5px 14px; font-size: 12px; color: var(--grey-90); white-space: nowrap; }
+  .map-pill.show { display: flex; }
+  .map-pill .dot { width: 10px; height: 10px; border-radius: 50%; background: #ffd400; border: 2px solid var(--orange); flex-shrink: 0; }
+  .map-pill b { font-weight: 600; }
+  .map-pill .muted { color: var(--grey-70); }
+
+  /* ===== Buttons — ui/Button.tsx: rounded 6px, text-xs, font-medium, leading-5 ===== */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; border-radius: 6px; font-size: 12px; line-height: 20px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .12s; }
+  .btn.sz-std { padding: 4px 8px; }
+  .btn.sz-sm { padding: 2px 8px; }
+  .btn.primary { background: var(--primary); color: #fff; }
+  .btn.primary:hover { background: var(--primary-dark); }
+  .btn.secondary { background: var(--grey-10); border-color: var(--grey-30); color: var(--primary-dark); }
+  .btn.secondary:hover { background: var(--grey-30); }
+  .btn.hollow { background: transparent; color: var(--primary-dark); }
+  .btn.hollow:hover { background: var(--grey-20); }
+  .btn.selected { background: var(--blue-10); border-color: var(--blue-50); color: var(--blue-60); }
+  .btn.selected:hover { background: var(--blue-20); }
+  .btn.disabled, .btn:disabled { background: var(--grey-20); color: var(--grey-50); border-color: transparent; cursor: not-allowed; }
+  .btn .cnt { font-family: var(--mono); font-size: 11px; opacity: .75; }
+  .btn:focus-visible, .cb:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--blue-40); }
+
+  /* ===== Checkbox — components2/Checkbox: size-4, rounded 4px, border grey-30; checked bg-primary ===== */
+  .cbw { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: var(--primary); user-select: none; }
+  .cb { width: 16px; height: 16px; flex-shrink: 0; border-radius: 4px; border: 1px solid var(--grey-30); background: #fff; display: grid; place-content: center; color: #fff; font-size: 11px; line-height: 1; font-weight: 700; cursor: pointer; padding: 0; }
+  .cb.on, .cb.some { background: var(--primary); border-color: var(--primary); }
+  .cbw .cnt { font-family: var(--mono); font-size: 11px; color: var(--grey-50); }
+
+  /* ===== Field Notes tab panel ===== */
+  .panel { width: 520px; flex-shrink: 0; background: #fff; border-left: 1px solid var(--grey-30); display: flex; flex-direction: column; min-height: 0; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 8px 12px; margin-bottom: 4px; }
+  .panel-head h1 { font-size: 18px; font-weight: 500; }
+  .x-btn { width: 28px; height: 28px; border: none; background: none; border-radius: 6px; color: var(--grey-70); font-size: 20px; cursor: pointer; line-height: 1; }
+  .x-btn:hover { background: var(--grey-20); }
+  .panel-body { flex: 1; overflow-y: auto; padding: 0 8px 24px; }
+
+  .filter-bar { border: 1px solid var(--grey-20); background: var(--grey-10); border-radius: 4px; padding: 10px 10px 8px; margin: 0 0 10px; }
+  .fb-row { display: flex; align-items: flex-start; gap: 10px; }
+  .fb-label { font-size: 12px; font-weight: 500; color: var(--grey-70); width: 82px; flex-shrink: 0; padding-top: 3px; }
+  .fb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fb-row + .fb-row { margin-top: 8px; }
+  .fb-summary { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--grey-20); font-size: 12px; color: var(--grey-70); display: flex; justify-content: space-between; align-items: center; }
+  .fb-summary b { color: var(--grey-90); font-weight: 600; }
+  .link-btn { border: none; background: none; color: var(--blue-50); font-size: 12px; cursor: pointer; padding: 0; }
+  .link-btn:hover { text-decoration: underline; }
+  .soon { font-size: 10px; color: var(--grey-50); font-style: italic; }
+
+  .actions-row { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; gap: 8px; position: relative; }
+  .dd { position: absolute; right: 0; top: 34px; z-index: 20; background: #fff; border: 1px solid var(--grey-30); border-radius: 6px; box-shadow: var(--shadow-md); padding: 4px; min-width: 150px; display: none; }
+  .dd.open { display: block; }
+  .dd div { padding: 6px 10px; font-size: 13px; border-radius: 4px; cursor: pointer; }
+  .dd div:hover { background: var(--grey-10); }
+
+  .day-group h5 { font-size: 14px; font-weight: 700; margin: 10px 0 2px; display: flex; gap: 8px; align-items: baseline; }
+  .day-group h5 .n { font-weight: 400; font-size: 12px; color: var(--grey-50); }
+  .thumbs { display: flex; flex-wrap: wrap; }
+  .thumb-wrap { padding: 5px; position: relative; }
+  .thumb { width: 150px; height: 150px; border-radius: 6px; border: 1px solid var(--grey-30); overflow: hidden; cursor: pointer; display: block; position: relative; }
+  .thumb svg { display: block; width: 100%; height: 100%; }
+  .thumb-wrap .tcb { position: absolute; top: 0; right: 0; margin: 8px; display: none; }
+  .thumb-wrap:hover .tcb, .thumbs.selecting .tcb { display: block; }
+  .thumb-wrap.hl .thumb { outline: 2px solid var(--orange); outline-offset: 1px; }
+  .vid-badge { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.6); color: #fff; font-size: 10px; border-radius: 4px; padding: 1px 6px; }
+  .empty { font-size: 13px; color: var(--grey-70); padding: 24px 8px; text-align: center; }
+
+  /* ===== Layer picker — Widgets/Layers/TOC.tsx: left-4 top-4, w-[26rem], rounded-sm, p-1, shadow-lg, border grey-30 ===== */
+  .toc { position: absolute; left: 16px; top: 16px; z-index: 7; width: 416px; max-width: 80%; max-height: 90%; display: none; flex-direction: column; background: #fff; border: 1px solid var(--grey-30); border-radius: 2px; box-shadow: var(--shadow-lg); padding: 4px; }
+  .toc.open { display: flex; }
+  .toc-head { display: flex; align-items: center; justify-content: space-between; padding: 8px; }
+  .toc-head .t { font-size: 16px; font-weight: 600; }
+  .toc-head .r { display: flex; gap: 8px; align-items: center; }
+  .toc-search { margin: 0 8px 4px; height: 28px; border: 1px solid var(--grey-30); border-radius: 4px; font-size: 12px; color: var(--grey-50); padding: 0 8px; display: flex; align-items: center; }
+  .toc-list { overflow-y: auto; padding: 0 8px 4px 4px; margin: 4px 0; }
+  .toc-sec { margin: 8px 0; padding: 0 4px; }
+  .toc-sec-row { display: flex; align-items: center; gap: 8px; }
+  .toc-chev { width: 16px; font-size: 10px; color: var(--grey-70); cursor: pointer; text-align: center; }
+  .toc-children { margin: 8px 0 8px 10px; }
+  .toc-layer { margin: 4px 0 4px 28px; min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .lyr-filter-btn { border: 1px solid transparent; background: none; border-radius: 6px; font-size: 11px; font-weight: 500; color: var(--grey-70); padding: 2px 6px; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+  .lyr-filter-btn:hover { background: var(--grey-20); }
+  .lyr-filter-btn.active { background: var(--blue-10); border-color: var(--blue-50); color: var(--blue-60); }
+  .lyr-filter { margin: 2px 0 8px 52px; border-left: 2px solid var(--blue-20); padding: 6px 0 6px 12px; }
+  .lyr-filter .lf-title { font-size: 11px; font-weight: 600; color: var(--grey-70); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .lyr-filter .lf-row { min-height: 26px; display: flex; align-items: center; }
+  .lyr-filter .lf-soon { margin-top: 6px; font-size: 11px; color: var(--grey-50); font-style: italic; }
+
+  /* ===== Viewer modal — FieldNoteViewer.tsx ===== */
+  .scrim { display: none; position: fixed; inset: 0; background: rgba(29,30,32,0.5); z-index: 250; align-items: center; justify-content: center; }
+  .scrim.open { display: flex; }
+  .viewer { position: relative; background: #fff; border-radius: 8px; padding: 20px 24px 20px; max-width: 90vw; max-height: 90vh; box-shadow: 0 0 32px 1px rgba(0,0,0,.25); width: 640px; }
+  .viewer .x-btn { position: absolute; right: 8px; top: 8px; }
+  .nitem { font-size: 14px; margin-bottom: 2px; }
+  .nitem b { font-weight: 700; }
+  .nitem .mono { font-family: var(--mono); font-size: 13px; }
+  .viewer-img { margin-top: 10px; display: flex; justify-content: center; }
+  .viewer-img svg { width: 100%; max-height: 60vh; border-radius: 4px; }
+
+  /* toast — Notify.info */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 260; background: var(--primary); color: #fff; font-size: 13px; padding: 10px 16px; border-radius: 6px; box-shadow: var(--shadow-md); max-width: 560px; display: none; }
+  .toast.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <span class="proto-badge">Prototype</span>
+  <span class="proto-desc">Field Notes — Day Filter</span>
+  <div class="ab-toggle" role="group" aria-label="Layout toggle">
+    <button class="ab-btn active" data-variant="a" onclick="setVariant('a')">A · In the tab</button>
+    <button class="ab-btn" data-variant="b" onclick="setVariant('b')">B · On the map layer</button>
+  </div>
+  <span class="proto-build" id="proto-build">BUILD —</span>
+  <div class="proto-actions">
+    <button class="proto-about-btn" id="about-open" onclick="toggleInfo()">About</button>
+    <button class="proto-fb-btn" id="fb-open">Give Feedback Here</button>
+  </div>
+</div>
+
+<div class="info-panel" id="info-panel">
+  <div class="info-panel-title">Field Notes — Day Filter</div>
+  <div class="info-panel-section"><strong>Purpose</strong><p>A water-utility customer asked to filter field-note photos by the day they were taken, then look at only that day's points on the map. This prototype compares two places the filter could live: in the Field Notes tab, or on the Field Notes layer in the map's layer picker.</p></div>
+  <div class="info-panel-section"><strong>Linear project</strong><p><a class="info-panel-link" href="https://linear.app/civilgrid/project/field-notes-viewing-enhancements-0dcaa3f851d7" target="_blank" rel="noopener">Field Notes viewing enhancements &#8599;</a></p></div>
+  <div class="info-panel-section"><strong>What to notice</strong><ul>
+    <li><b>A · In the tab</b>: day chips sit above the photo list. Picking one or more days filters the list, the map pins and direction cones, and the export. "Select all" and "Export Images" act only on what's showing, with counts. The tab's list and its map already read the same data, so the map follows the filter with little extra work.</li>
+    <li><b>B · On the map layer</b>: the same day filter is attached to the Field Notes layer in the layer picker, so it holds on the project map and any tab. This matches "filter, then look at the filtered layer on the map" more literally. It adds no list and no export.</li>
+    <li>Both show a filter pill at the top of the map so a filtered map is never mistaken for the full record. Its Clear button resets the filter.</li>
+    <li>Days are chips with counts, not a calendar. Capture days are few and scattered, and the tab already groups photos by day.</li>
+    <li>The photographer filter is shown disabled. It's the sibling request in the same project.</li>
+  </ul></div>
+  <details class="info-panel-details"><summary>Build history</summary><ul><li><b>b001</b>: initial build. A: day filter in the tab; B: day filter on the map layer</li></ul></details>
+  <details class="info-panel-details">
+    <summary>If we build this — Linear issues</summary>
+    <div class="grp"><b>Foundation / data</b><ul>
+      <li>Confirm field notes carry capture time, separate from upload time, and expose it to web</li>
+      <li>Bucket field notes by day in the project's local time zone</li>
+    </ul></div>
+    <div class="grp"><b>Field Notes tab (A)</b><ul>
+      <li>Add day filter chips with counts to the Field Notes tab</li>
+      <li>Filter tab map pins and direction cones from the filtered set</li>
+      <li>Scope Select all and Export Images to the filtered set; show counts</li>
+      <li>Add filtered-map indicator pill with Clear</li>
+    </ul></div>
+    <div class="grp"><b>Layer picker (B)</b><ul>
+      <li>Add a day filter control to the Field Notes layer in the layer picker</li>
+      <li>Keep the Field Notes layer filter in layer state so it persists across tabs</li>
+    </ul></div>
+    <div class="grp"><b>Decisions &amp; spikes</b><ul>
+      <li>Tab (A), layer (B), or both sharing one filter state? <span class="note">(eng + account team; confirm with customer)</span></li>
+      <li>Is <code>createdAt</code> the capture time or the upload/import time for offline-synced and bulk-imported notes? <span class="note">(eng; see Import Photos en masse)</span></li>
+      <li>One filter bar shared with the photographer filter? <span class="note">(CG-1070; design)</span></li>
+      <li>Pick single days, multiple days, or a date range? <span class="note">(customer)</span></li>
+      <li>Triage IDEA-98 into this project <span class="note">(project lead)</span></li>
+    </ul></div>
+  </details>
+</div>
+
+<nav class="top-nav">
+  <span class="logo">CIVILGRID</span>
+  <span class="nav-page">Projects <span class="chev">&#9662;</span></span>
+  <span class="crumb">Cascade Water <span class="sep">/</span> Cascade Water Main Replacement <span class="chev">&#9662;</span></span>
+  <div class="nav-right">
+    <span class="nav-ico">&#9675;</span>
+    <span class="nav-ico">?</span>
+    <span class="nav-avatar">AC</span>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="left-nav">
+    <div class="ln-back">&#8592; Home</div>
+    <div class="ln-inner">
+      <div class="ln-proj">
+        <div class="bar"></div>
+        <div>
+          <div class="lp-name">Cascade Water Main Replacement</div>
+          <div class="lp-pm">PM: A. Chen</div>
+          <span class="lp-badge">Project</span>
+        </div>
+      </div>
+      <div class="ln-div"></div>
+      <div class="ln-section">General</div>
+      <div class="ln-items">
+        <div class="ln-item">Project Progress</div>
+        <div class="ln-item">Project Info</div>
+        <div class="ln-item">Team</div>
+        <div class="ln-item">Billing</div>
+        <div class="ln-item">Project Files</div>
+        <div class="ln-item">Downloads</div>
+      </div>
+      <div class="ln-div"></div>
+      <div class="ln-section">Analysis</div>
+      <div class="ln-items">
+        <div class="ln-item">Utilities</div>
+        <div class="ln-item">Land Rights</div>
+        <div class="ln-item">Geotechnical</div>
+        <div class="ln-item">Environmental</div>
+        <div class="ln-item" id="nav-field-notes">Field Notes</div>
+        <div class="ln-item">Potholing</div>
+        <div class="ln-item">Intelligence <span class="ln-beta">Beta</span></div>
+        <div class="ln-item">Proposal Packet</div>
+      </div>
+      <div class="ln-div"></div>
+      <div class="ln-section">CivilDraw</div>
+      <div class="ln-newmap">+ New Map</div>
+    </div>
+  </aside>
+
+  <!-- map (shared by both variants) -->
+  <div class="map" id="map">
+    <svg class="base" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice" id="map-svg">
+      <rect width="1000" height="700" fill="#e8e6df"/>
+      <!-- blocks / parks -->
+      <rect x="40" y="60" width="210" height="150" fill="#dfe6d3"/>
+      <rect x="690" y="430" width="240" height="180" fill="#dfe6d3"/>
+      <rect x="300" y="40" width="170" height="120" fill="#e1ded6"/>
+      <rect x="520" y="520" width="140" height="130" fill="#e1ded6"/>
+      <!-- streets -->
+      <g stroke="#ffffff" stroke-linecap="round" fill="none">
+        <path d="M60 690 L 940 25" stroke-width="22"/>
+        <path d="M-20 300 L 1020 380" stroke-width="12"/>
+        <path d="M200 -20 L 330 720" stroke-width="12"/>
+        <path d="M560 -20 L 640 720" stroke-width="12"/>
+        <path d="M860 -20 L 900 720" stroke-width="10"/>
+        <path d="M-20 520 L 1020 640" stroke-width="8"/>
+        <path d="M-20 140 L 1020 200" stroke-width="8"/>
+      </g>
+      <g font-family="Noto Sans, sans-serif" font-size="13" fill="#7a7d80">
+        <text x="150" y="630" transform="rotate(-37 150 630)">Riverside Ave</text>
+        <text x="700" y="372" transform="rotate(4 700 372)">Alder St</text>
+        <text x="250" y="130" transform="rotate(80 250 130)">5th St</text>
+      </g>
+      <!-- water main (project) -->
+      <path d="M190 590 L 810 120" stroke="#196fe0" stroke-width="4" opacity=".8"/>
+      <!-- project boundary -->
+      <polygon points="150,565 785,85 850,150 215,630" fill="rgba(242,126,49,0.06)" stroke="#f27e31" stroke-width="2.5" stroke-dasharray="10 6"/>
+      <g id="pins"></g>
+    </svg>
+
+    <button class="map-btn map-layers" onclick="toggleTOC()"><span>&#9783;</span> Layers</button>
+    <div class="map-btn map-tools"><div>+</div><div>&minus;</div><div>&#8982;</div><div>&#128207;</div></div>
+    <div class="map-attr">&#169; Mapbox &#169; OpenStreetMap</div>
+
+    <div class="map-pill" id="map-pill" role="status">
+      <span class="dot"></span>
+      <span><b>Field Notes</b> · <span id="pill-days"></span></span>
+      <span class="muted" id="pill-count"></span>
+      <button class="btn secondary sz-sm" onclick="clearDays()">Clear</button>
+    </div>
+
+    <!-- Variant B: layer picker -->
+    <div class="toc" id="toc">
+      <div class="toc-head">
+        <span class="t">Layers</span>
+        <span class="r">
+          <button class="btn secondary sz-std">Metadata</button>
+          <button class="btn hollow sz-std" aria-label="More">&#8943;</button>
+          <button class="x-btn" onclick="toggleTOC()" aria-label="Close layers">&times;</button>
+        </span>
+      </div>
+      <div class="toc-search">Search</div>
+      <div class="toc-list" id="toc-list"></div>
+    </div>
+  </div>
+
+  <!-- Variant A: Field Notes tab panel -->
+  <div class="panel" id="variant-a">
+    <div class="panel-head">
+      <h1>Field Notes</h1>
+      <button class="x-btn" aria-label="Close tab">&times;</button>
+    </div>
+    <div class="panel-body">
+      <div class="filter-bar">
+        <div class="fb-row">
+          <div class="fb-label">Day taken</div>
+          <div class="fb-chips" id="day-chips"></div>
+        </div>
+        <div class="fb-row">
+          <div class="fb-label">Photographer</div>
+          <div class="fb-chips"><button class="btn disabled sz-sm" disabled title="Planned: filter by photographer">All photographers &#9662;</button> <span class="soon" style="padding-top:3px">planned</span></div>
+        </div>
+        <div class="fb-summary" id="fb-summary"></div>
+      </div>
+
+      <div class="actions-row">
+        <div class="cbw" id="select-all"></div>
+        <div>
+          <button class="btn primary sz-std" id="export-btn" onclick="toggleExport(event)">Export Images</button>
+          <div class="dd" id="export-dd">
+            <div onclick="doExport('docx')">DOC (.docx)</div>
+            <div onclick="doExport('PDF')">PDF (.pdf)</div>
+            <div onclick="doExport('zip')">ZIP (.zip)</div>
+          </div>
+        </div>
+      </div>
+      <div id="groups"></div>
+    </div>
+  </div>
+</div>
+
+<!-- viewer modal -->
+<div class="scrim" id="viewer">
+  <div class="viewer" role="dialog" aria-modal="true" aria-label="Field note">
+    <button class="x-btn" onclick="closeViewer()" aria-label="Close">&times;</button>
+    <div id="viewer-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="fb-pane" id="fb-pane">
+  <div class="fb-head">
+    <span>Feedback on: <b id="fb-ctx"></b></span>
+    <button class="fb-close" onclick="fbClose()" aria-label="Close">&times;</button>
+  </div>
+  <iframe class="fb-frame" id="fb-frame" title="Prototype feedback form"></iframe>
+  <a class="fb-newtab" id="fb-newtab" target="_blank" rel="noopener">Open form in new tab &#8599;</a>
+</div>
+
+<script>
+// Build / version stamp
+const BUILD = 1;
+const BUILD_DATE = "Sep 30, 2026";
+const BUILD_STR = "b" + String(BUILD).padStart(3, "0");
+document.getElementById("proto-build").textContent = "BUILD " + String(BUILD).padStart(3, "0") + " · " + BUILD_DATE;
+
+// ---------- fake data ----------
+const DAYS = [
+  { key: "2026-09-29", short: "Sep 29", full: "Sep 29, 2026", who: ["A. Chen"], span: [0.80, 0.97],
+    notes: ["Post-paving check at tie-in, patch settled", "New valve box flush with grade", "Restoration complete, curb ramp intact"] },
+  { key: "2026-09-25", short: "Sep 25", full: "Sep 25, 2026", who: ["M. Rivera"], span: [0.58, 0.82],
+    notes: ["Existing 8in CI main exposed at 4.5ft", "Gas service crossing, marked yellow", "Hydrant lateral, needs relocation", "Tree roots over alignment", "Storm inlet, conflict with proposed main"] },
+  { key: "2026-09-24", short: "Sep 24", full: "Sep 24, 2026", who: ["J. Park", "A. Chen"], span: [0.26, 0.60],
+    notes: ["811 paint: water (blue) and comm (orange)", "Gate valve cover, seized", "Meter box at 1420 Alder", "Fiber handhole in sidewalk", "Air release valve vault", "Service lateral, copper", "Pavement crack along trench line", "Electric vault lid, 2x3", "Blowoff at dead end"] },
+  { key: "2026-09-22", short: "Sep 22", full: "Sep 22, 2026", who: ["M. Rivera"], span: [0.03, 0.30],
+    notes: ["Site walk start at Riverside Ave", "Traffic control staging area", "Existing survey monument", "Overhead power, 22ft clearance", "Driveway approach, concrete", "Sewer MH rim, check elevation"] },
+];
+function rng(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+const R = rng(42);
+const NOTES = [];
+DAYS.forEach((d, di) => {
+  d.notes.forEach((txt, i) => {
+    const t = d.span[0] + (d.span[1] - d.span[0]) * (i + 0.5) / d.notes.length;
+    const x = 190 + 620 * t, y = 590 - 470 * t;
+    const off = (R() - 0.5) * 70;
+    const isVideo = (di === 1 && i === 2) || (di === 2 && i === 5);
+    const hour = 8 + Math.floor(R() * 7), min = Math.floor(R() * 60);
+    NOTES.push({
+      id: d.key + "-" + i, day: d.key, dayFull: d.full, type: isVideo ? "video" : "image",
+      by: d.who[i % d.who.length], notes: txt,
+      x: x + off * 0.6, y: y + off * 0.8,
+      heading: isVideo ? null : Math.round(R() * 359),
+      lng: (-122.6811 + t * 0.0142 + off * 0.00001).toFixed(6), lat: (45.5162 + t * 0.0069 + off * 0.00001).toFixed(6),
+      time: (hour > 12 ? hour - 12 : hour) + ":" + String(min).padStart(2, "0") + (hour >= 12 ? " PM" : " AM"),
+      scene: Math.floor(R() * 4), seed: Math.floor(R() * 1000),
+    });
+  });
+});
+
+// ---------- state ----------
+let variant = "a";
+const selectedDays = new Set();   // empty = all days
+const selectedIds = new Set();
+let hoveredId = null;
+let fnLayerOn = true, lyrFilterOpen = true;
+const expanded = new Set(["Site Data"]);
+
+const filtered = () => NOTES.filter(n => selectedDays.size === 0 || selectedDays.has(n.day));
+const countFor = key => NOTES.filter(n => n.day === key).length;
+const dayLabel = () => DAYS.filter(d => selectedDays.has(d.key)).map(d => d.short).reverse().join(", ");
+
+function toggleDay(key) {
+  selectedDays.has(key) ? selectedDays.delete(key) : selectedDays.add(key);
+  if (selectedDays.size === DAYS.length) selectedDays.clear();
+  pruneSelection(); render();
+}
+function clearDays() { selectedDays.clear(); render(); }
+function pruneSelection() { const ok = new Set(filtered().map(n => n.id)); [...selectedIds].forEach(id => { if (!ok.has(id)) selectedIds.delete(id); }); }
+
+// ---------- photo placeholders ----------
+function sceneSVG(n, w, h) {
+  const r = rng(n.seed + 7);
+  const grounds = ["#6b6e70", "#7d9a5a", "#a38b6a", "#bfbdb6"];
+  const g = grounds[n.scene], hz = 45 + r() * 25;
+  let obj = "";
+  if (n.scene === 0) obj = `<ellipse cx="${40 + r() * 20}" cy="${hz + 22}" rx="14" ry="6" fill="#4a4c4e" stroke="#393b3d" stroke-width="1"/><path d="M10 ${hz + 34} L 90 ${hz + 30}" stroke="#f2bc46" stroke-width="2" stroke-dasharray="5 4"/>`;
+  else if (n.scene === 1) obj = `<rect x="${30 + r() * 20}" y="${hz + 8}" width="22" height="16" fill="#9a9c98" stroke="#6e7376" stroke-width=".6"/><path d="M5 ${hz + 30} L 95 ${hz + 26}" stroke="#196fe0" stroke-width="2" stroke-dasharray="5 4"/>`;
+  else if (n.scene === 2) obj = `<rect x="${20 + r() * 30}" y="${hz + 4}" width="40" height="22" fill="#5e4b35" opacity=".7"/><rect x="${25 + r() * 20}" y="${hz + 12}" width="36" height="4" fill="#6e7376"/>`;
+  else obj = `<rect x="${35 + r() * 20}" y="${hz - 22}" width="4" height="24" fill="#8a6f4e"/><path d="M0 ${hz - 18} L 100 ${hz - 24}" stroke="#393b3d" stroke-width=".8"/>`;
+  return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${n.notes}" style="aspect-ratio:${w}/${h}">
+    <rect width="100" height="100" fill="#bcd4e6"/><rect y="${hz}" width="100" height="${100 - hz}" fill="${g}"/>${obj}</svg>`;
+}
+
+// ---------- map pins ----------
+function cone(n) {
+  if (n.heading == null) return "";
+  const a = (n.heading - 90) * Math.PI / 180, s = 22 * Math.PI / 180, L = 30;
+  const p1 = [n.x + L * Math.cos(a - s), n.y + L * Math.sin(a - s)], p2 = [n.x + L * Math.cos(a + s), n.y + L * Math.sin(a + s)];
+  return `<path d="M${n.x} ${n.y} L${p1[0]} ${p1[1]} A${L} ${L} 0 0 1 ${p2[0]} ${p2[1]} Z" fill="rgba(242,126,49,0.35)" stroke="rgba(242,126,49,0.8)" stroke-width="1"/>`;
+}
+function renderPins() {
+  const show = fnLayerOn;
+  const list = show ? filtered() : [];
+  document.getElementById("pins").innerHTML = list.map(n => {
+    const hov = n.id === hoveredId;
+    return `<g class="pin" data-id="${n.id}" onclick="openViewer('${n.id}')" onmouseover="hover('${n.id}')" onmouseout="hover(null)">${cone(n)}
+      <circle cx="${n.x}" cy="${n.y}" r="7" fill="${hov ? "orange" : "yellow"}" stroke="${hov ? "green" : "orange"}" stroke-width="${hov ? 5 : 2}"/>
+      <title>${n.dayFull} · ${n.by} · ${n.notes}</title></g>`;
+  }).join("");
+  const pill = document.getElementById("map-pill");
+  pill.classList.toggle("show", selectedDays.size > 0 && show);
+  document.getElementById("pill-days").textContent = dayLabel();
+  document.getElementById("pill-count").textContent = filtered().length + " of " + NOTES.length + " shown";
+}
+function hover(id) {
+  hoveredId = id;
+  // update in place — rebuilding the pin layer on hover would detach the element under the cursor
+  document.querySelectorAll("#pins .pin").forEach(g => {
+    const on = g.dataset.id === id, c = g.querySelector("circle");
+    c.setAttribute("fill", on ? "orange" : "yellow");
+    c.setAttribute("stroke", on ? "green" : "orange");
+    c.setAttribute("stroke-width", on ? 5 : 2);
+  });
+  document.querySelectorAll(".thumb-wrap").forEach(el => el.classList.toggle("hl", el.dataset.id === id));
+}
+
+// ---------- A: tab panel ----------
+function renderA() {
+  document.getElementById("day-chips").innerHTML =
+    `<button class="btn sz-sm ${selectedDays.size === 0 ? "selected" : "secondary"}" onclick="clearDays()" aria-pressed="${selectedDays.size === 0}">All days <span class="cnt">${NOTES.length}</span></button>` +
+    DAYS.map(d => { const on = selectedDays.has(d.key);
+      return `<button class="btn sz-sm ${on ? "selected" : "secondary"}" onclick="toggleDay('${d.key}')" aria-pressed="${on}">${d.short} <span class="cnt">${countFor(d.key)}</span></button>`; }).join("");
+
+  const f = filtered();
+  document.getElementById("fb-summary").innerHTML = selectedDays.size === 0
+    ? `<span>Showing all <b>${NOTES.length}</b> field notes across ${DAYS.length} days</span>`
+    : `<span>Showing <b>${f.length}</b> of ${NOTES.length} field notes · ${dayLabel()}</span><button class="link-btn" onclick="clearDays()">Clear filter</button>`;
+
+  const allSel = f.length > 0 && f.every(n => selectedIds.has(n.id)), someSel = selectedIds.size > 0 && !allSel;
+  const sa = document.getElementById("select-all");
+  sa.innerHTML = `<button class="cb ${allSel ? "on" : someSel ? "some" : ""}" role="checkbox" aria-checked="${allSel ? "true" : someSel ? "mixed" : "false"}">${allSel ? "&#10003;" : someSel ? "&minus;" : ""}</button> Select all <span class="cnt">${f.length}</span>`;
+  sa.onclick = () => { if (allSel) selectedIds.clear(); else f.forEach(n => selectedIds.add(n.id)); render(); };
+
+  const eb = document.getElementById("export-btn");
+  eb.disabled = selectedIds.size === 0;
+  eb.className = "btn sz-std " + (selectedIds.size === 0 ? "disabled" : "primary");
+  eb.innerHTML = selectedIds.size === 0 ? "Export Images" : `Export ${selectedIds.size} image${selectedIds.size > 1 ? "s" : ""} &#9662;`;
+
+  const groups = DAYS.filter(d => selectedDays.size === 0 || selectedDays.has(d.key));
+  document.getElementById("groups").innerHTML = groups.map(d => {
+    const items = NOTES.filter(n => n.day === d.key);
+    return `<div class="day-group"><h5>${d.full} <span class="n">${items.length} · ${d.who.join(", ")}</span></h5>
+      <div class="thumbs ${selectedIds.size > 0 ? "selecting" : ""}">${items.map(n => { const on = selectedIds.has(n.id);
+        return `<div class="thumb-wrap ${n.id === hoveredId ? "hl" : ""}" data-id="${n.id}" onmouseover="hover('${n.id}')" onmouseout="hover(null)">
+          <button class="cb tcb ${on ? "on" : ""}" role="checkbox" aria-checked="${on}" aria-label="Select" onclick="toggleSel(event,'${n.id}')">${on ? "&#10003;" : ""}</button>
+          <div class="thumb" onclick="openViewer('${n.id}')">${sceneSVG(n, 150, 150)}${n.type === "video" ? '<span class="vid-badge">&#9654; Video</span>' : ""}</div></div>`; }).join("")}</div></div>`;
+  }).join("");
+}
+function toggleSel(e, id) { e.stopPropagation(); selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id); render(); }
+function toggleExport(e) { e.stopPropagation(); if (selectedIds.size) document.getElementById("export-dd").classList.toggle("open"); }
+function doExport(kind) {
+  document.getElementById("export-dd").classList.remove("open");
+  toast(`Your image report download (${kind}) of ${selectedIds.size} image${selectedIds.size > 1 ? "s" : ""} has started. You will receive the file in your email in the next few minutes.`);
+}
+document.addEventListener("click", () => document.getElementById("export-dd").classList.remove("open"));
+
+// ---------- B: layer picker ----------
+const OTHER_SECTIONS = [
+  { label: "Utilities", children: ["Electric Distribution", "Gas Distribution", "Water Mains", "Fiber Routes"] },
+  { label: "Environmental", children: ["Flood Zones", "Wetlands"] },
+  { label: "Jurisdictional", children: ["City Limits", "Paving Moratoria"] },
+];
+function cbHTML(on, some, label, onclick, extra = "") {
+  return `<span class="cbw" onclick="${onclick}"><button class="cb ${on ? "on" : some ? "some" : ""}" role="checkbox" aria-checked="${on ? "true" : some ? "mixed" : "false"}">${on ? "&#10003;" : some ? "&minus;" : ""}</button>${label}${extra}</span>`;
+}
+function renderB() {
+  const sec = (s) => {
+    const open = expanded.has(s.label);
+    return `<div class="toc-sec"><div class="toc-sec-row"><span class="toc-chev" onclick="toggleSec('${s.label}')">${open ? "&#9660;" : "&#9654;"}</span>${cbHTML(false, false, s.label, "")}</div>
+      ${open ? `<div class="toc-children">${s.children.map(c => `<div class="toc-layer">${cbHTML(false, false, c, "")}</div>`).join("")}</div>` : ""}</div>`;
+  };
+  const siteOpen = expanded.has("Site Data");
+  const active = selectedDays.size > 0;
+  const fBtn = `<button class="lyr-filter-btn ${active ? "active" : ""}" onclick="toggleLyrFilter()" aria-expanded="${lyrFilterOpen}" title="Filter this layer">&#9776; ${active ? dayLabel() : "Filter"}</button>`;
+  const dayRows = `<div class="lf-row">${cbHTML(selectedDays.size === 0, false, "All days", "clearDays()", ` <span class="cnt">${NOTES.length}</span>`)}</div>` +
+    DAYS.map(d => `<div class="lf-row">${cbHTML(selectedDays.size === 0 || selectedDays.has(d.key), false, d.full, `toggleDayB('${d.key}')`, ` <span class="cnt">${countFor(d.key)}</span>`)}</div>`).join("");
+  const site = `<div class="toc-sec"><div class="toc-sec-row"><span class="toc-chev" onclick="toggleSec('Site Data')">${siteOpen ? "&#9660;" : "&#9654;"}</span>${cbHTML(fnLayerOn, false, "Site Data", "toggleFnLayer()")}</div>
+    ${siteOpen ? `<div class="toc-children">
+      <div class="toc-layer">${cbHTML(fnLayerOn, false, "Field Notes", "toggleFnLayer()")}${fnLayerOn && variant === "b" ? fBtn : ""}</div>
+      ${fnLayerOn && lyrFilterOpen && variant === "b" ? `<div class="lyr-filter"><div class="lf-title"><span>Day taken</span>${active ? '<button class="link-btn" onclick="clearDays()">Clear</button>' : ""}</div>${dayRows}<div class="lf-soon">Photographer filter planned</div></div>` : ""}
+      <div class="toc-layer">${cbHTML(false, false, "Potholes", "")}</div>
+    </div>` : ""}</div>`;
+  document.getElementById("toc-list").innerHTML = OTHER_SECTIONS.map(sec).join("") + site;
+}
+// B semantics: checkboxes show what's visible; unchecking one day from "all" keeps the others
+function toggleDayB(key) {
+  if (selectedDays.size === 0) { DAYS.forEach(d => { if (d.key !== key) selectedDays.add(d.key); }); pruneSelection(); render(); return; }
+  if (selectedDays.size === 1 && selectedDays.has(key)) return; // keep at least one day checked
+  toggleDay(key);
+}
+function toggleSec(label) { expanded.has(label) ? expanded.delete(label) : expanded.add(label); renderB(); }
+function toggleFnLayer() { fnLayerOn = !fnLayerOn; render(); }
+function toggleLyrFilter() { lyrFilterOpen = !lyrFilterOpen; renderB(); }
+function toggleTOC() { document.getElementById("toc").classList.toggle("open"); }
+
+// ---------- viewer ----------
+function openViewer(id) {
+  const n = NOTES.find(x => x.id === id);
+  const card = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const dir = n.heading == null ? "" : `<div class="nitem"><b>Direction: </b>${card[Math.round(n.heading / 45) % 8]} ${n.heading}°</div>`;
+  document.getElementById("viewer-body").innerHTML = `
+    <div class="nitem"><b>Date: </b>${n.dayFull}</div>
+    <div class="nitem"><b>Uploaded By: </b>${n.by}</div>
+    <div class="nitem"><b>Notes: </b>${n.notes}</div>
+    <div class="nitem"><b>Location: </b><span class="mono">${n.lng}, ${n.lat}</span></div>${dir}
+    <div class="viewer-img">${sceneSVG(n, 640, 400)}</div>`;
+  document.getElementById("viewer").classList.add("open");
+  window.__prevScreen = window.__activeScreen; window.__activeScreen = currentLabel() + " — photo viewer";
+}
+function closeViewer() { document.getElementById("viewer").classList.remove("open"); window.__activeScreen = currentLabel(); }
+
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(window.__tt); window.__tt = setTimeout(() => t.classList.remove("show"), 4000); }
+
+// ---------- variants ----------
+function currentLabel() { return variant === "a" ? "Layout A — Filter in Field Notes tab" : "Layout B — Filter on Field Notes map layer"; }
+function setVariant(v) {
+  variant = v;
+  document.getElementById("variant-a").style.display = v === "a" ? "flex" : "none";
+  document.getElementById("toc").classList.toggle("open", v === "b");
+  if (v === "a") fnLayerOn = true;
+  document.querySelector(".map-layers").style.display = "flex";
+  document.getElementById("nav-field-notes").classList.toggle("active", v === "a");
+  document.querySelectorAll(".ab-btn").forEach(b => b.classList.toggle("active", b.dataset.variant === v));
+  window.__activeScreen = currentLabel();
+  render();
+}
+function render() { renderA(); renderB(); renderPins(); }
+
+// "About" panel
+function toggleInfo() {
+  const ip = document.getElementById('info-panel');
+  const willOpen = !ip.classList.contains('open');
+  ip.classList.toggle('open');
+  if (willOpen) document.getElementById('fb-pane').classList.remove('open');
+}
+
+// Shared Prototype Feedback Google Form — stable across all prototypes (see skills/paper-prototype.md).
+const FEEDBACK_FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScL5E6fBEKDbP5Ot4_ZKSr6V0rAOAKLHT_SiaFNXYcp-EikyQ/viewform";
+const FB_ENTRY = { prototype: "entry.569555452", build: "entry.336905221", screen: "entry.1690117284" };
+const FILE_NAME = (window.location.pathname.split("/").pop() || "unknown.html");
+const PROTOTYPE_SLUG = FILE_NAME.replace(/\.html?$/i, "").replace(/-b\d{3,}$/i, "");
+const PROTOTYPE_NAME = PROTOTYPE_SLUG.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+function fbUrl(embedded) {
+  const u = new URL(FEEDBACK_FORM_BASE);
+  if (embedded) u.searchParams.set("embedded", "true");
+  u.searchParams.set(FB_ENTRY.prototype, PROTOTYPE_NAME);
+  u.searchParams.set(FB_ENTRY.build, FILE_NAME);
+  u.searchParams.set(FB_ENTRY.screen, window.__activeScreen);
+  return u.toString();
+}
+function fbOpen() {
+  document.getElementById('fb-ctx').textContent = PROTOTYPE_NAME + ' / ' + window.__activeScreen;
+  document.getElementById('fb-frame').src = fbUrl(true);
+  document.getElementById('fb-newtab').href = fbUrl(false);
+  document.getElementById('info-panel').classList.remove('open');
+  document.getElementById('fb-pane').classList.add('open');
+}
+function fbClose() { document.getElementById('fb-pane').classList.remove('open'); }
+document.getElementById('fb-open').onclick = fbOpen;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fbClose(); });
+
+setVariant("a");
+</script>
+</body>
+</html>
